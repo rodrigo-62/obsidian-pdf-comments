@@ -92,6 +92,11 @@ export class PdfCommentsView extends FileView {
 			this.openFind();
 			return false;
 		});
+		// Inside the PDF view only (DECISIONS F1.3); the commands can get other hotkeys.
+		this.scope.register(['Mod', 'Alt'], 'm', () => {
+			void this.comments?.addComment();
+			return false;
+		});
 	}
 
 	getViewType(): string {
@@ -254,6 +259,19 @@ export class PdfCommentsView extends FileView {
 		});
 		eventBus.on('pagesloaded', () => comments.layoutChanged());
 		eventBus.on('pagerendered', (e: { pageNumber: number }) => comments.pageRendered(e.pageNumber));
+		// PDF.js labels each page "Page N" for screen readers (also later, when its translations
+		// arrive); Obsidian shows every aria-label as a tooltip on hover (DECISIONS F1.4).
+		const unlabel = (el: Element) => {
+			if (el.hasClass('page') && el.hasAttribute('aria-label')) el.removeAttribute('aria-label');
+		};
+		const labels = new MutationObserver((records) => {
+			for (const r of records) {
+				if (r.type === 'attributes') unlabel(r.target as Element);
+				else r.addedNodes.forEach((n) => n instanceof Element && unlabel(n));
+			}
+		});
+		labels.observe(this.pagesEl, { subtree: true, childList: true, attributes: true, attributeFilter: ['aria-label'] });
+		this.register(() => labels.disconnect());
 		eventBus.on('textlayerrendered', (e: { pageNumber: number }) => comments.pageRendered(e.pageNumber));
 		eventBus.on('updateviewarea', (e: { location?: ViewLocation }) => {
 			if (viewer.currentScale !== this.lastScale) {
@@ -632,8 +650,10 @@ export class PdfCommentsView extends FileView {
 
 	/** Applies the plugin's page colours (called for every view when they change). */
 	applyPageTheme(): void {
-		const theme = this.plugin.settings.pageTheme;
+		const { pageTheme: theme, sepiaColor, darkInvert } = this.plugin.settings;
 		for (const t of PAGE_THEMES) this.contentEl.toggleClass(`pdfc-theme-${t}`, t === theme);
+		this.contentEl.style.setProperty('--pdfc-sepia-paper', sepiaColor);
+		this.contentEl.style.setProperty('--pdfc-dark-invert', String(darkInvert));
 		if (this.themeBtn) setIcon(this.themeBtn, PAGE_THEME_ICONS[theme]);
 	}
 

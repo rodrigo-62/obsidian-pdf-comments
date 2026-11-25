@@ -394,9 +394,9 @@ describe('sidecar', () => {
 	});
 
 	it('keeps other properties and replaces its own, body regenerated', () => {
-		const existing = ['---', 'tags: [reading]', 'pdf: "[[Old/Name.pdf]]"', 'aliases:', '  - Smith', 'pdf-fingerprint: "old"', '---', 'my edits', '', '<!--pdf-comments:threads', '{}', '-->', ''].join('\n');
+		const existing = ['---', 'tags: [reading]', 'commented-pdf: "[[Old/Name.pdf]]"', 'aliases:', '  - Smith', 'commented-pdf-fingerprint: "old"', '---', 'my edits', '', '<!--pdf-comments:threads', '{}', '-->', ''].join('\n');
 		const out = buildSidecar(existing, { pdfPath: 'New/Name.pdf', fingerprint: null, threads: {}, digest: 'DIGEST' });
-		expect(out).toBe(['---', 'pdf: "[[New/Name.pdf]]"', 'tags: [reading]', 'aliases:', '  - Smith', '---', 'DIGEST', '', '<!--pdf-comments:threads', '{}', '-->', ''].join('\n'));
+		expect(out).toBe(['---', 'commented-pdf: "[[New/Name.pdf]]"', 'tags: [reading]', 'aliases:', '  - Smith', '---', 'DIGEST', '', '<!--pdf-comments:threads', '{}', '-->', ''].join('\n'));
 		expect(sidecarBody(out)).toBe('DIGEST');
 		const r = parseSidecar(out);
 		expect(r.ok && r.data.fingerprint).toBe(null);
@@ -416,8 +416,15 @@ describe('sidecar', () => {
 		expect(parsePdfLink('Papers/A.pdf')).toBe('Papers/A.pdf');
 		expect(parsePdfLink('')).toBeNull();
 		expect(parsePdfLink(null)).toBeNull();
-		const r = parseSidecar("---\npdf: '[[It''s.pdf]]'\n---\n");
+		const r = parseSidecar("---\ncommented-pdf: '[[It''s.pdf]]'\n---\n");
 		expect(r.ok && r.data.pdfLink).toBe("It's.pdf");
+	});
+
+	it('reads notes written with the pre-0.2 names and writes the new ones', () => {
+		const old = '---\npdf: "[[A.pdf]]"\npdf-fingerprint: "f1"\ntags: [x]\n---\nbody\n\n<!--pdf-comments:threads\n{}\n-->\n';
+		const r = parseSidecar(old);
+		expect(r.ok && r.data).toMatchObject({ pdfLink: 'A.pdf', fingerprint: 'f1' });
+		expect(buildSidecar(old, { pdfPath: 'A.pdf', fingerprint: 'f1', threads: {}, digest: 'D' }).split('\n').slice(0, 5)).toEqual(['---', 'commented-pdf: "[[A.pdf]]"', 'commented-pdf-fingerprint: "f1"', 'tags: [x]', '---']);
 	});
 });
 

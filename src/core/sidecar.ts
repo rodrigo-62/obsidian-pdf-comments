@@ -1,8 +1,8 @@
 // The comment note of a PDF (SPEC §5.1, §5.2). Pure TypeScript.
 //
 //   ---
-//   pdf: "[[Papers/Smith 2021.pdf]]"
-//   pdf-fingerprint: "a1b2…"
+//   commented-pdf: "[[Papers/Smith 2021.pdf]]"
+//   commented-pdf-fingerprint: "a1b2…"
 //   (other properties you add are kept)
 //   ---
 //   (generated digest, digest.ts)
@@ -21,8 +21,13 @@ import { validAnchor, type Anchor } from './anchor';
 
 export const BLOCK_OPEN = '<!--pdf-comments:threads';
 export const BLOCK_CLOSE = '-->';
-export const PDF_KEY = 'pdf';
-export const FINGERPRINT_KEY = 'pdf-fingerprint';
+/** Specific names, so they can't be confused with other notes' properties (DECISIONS F1.6). */
+export const PDF_KEY = 'commented-pdf';
+export const FINGERPRINT_KEY = 'commented-pdf-fingerprint';
+/** Names of builds before 0.2: still read (in notes with the data block), replaced on the next write. */
+export const LEGACY_PDF_KEY = 'pdf';
+export const LEGACY_FINGERPRINT_KEY = 'pdf-fingerprint';
+const OWN_KEYS = [PDF_KEY, FINGERPRINT_KEY, LEGACY_PDF_KEY, LEGACY_FINGERPRINT_KEY];
 
 export interface PdfThread extends Thread {
 	/** Raw stored anchor; read it with `threadAnchor()` (a malformed one is kept, not shown). */
@@ -140,8 +145,8 @@ export type SidecarParse = { ok: true; data: SidecarData } | { ok: false; error:
 /** Reads a comment note. A malformed block gives ok:false, and the note must then not be overwritten. */
 export function parseSidecar(md: string): SidecarParse {
 	const fm = readFrontmatter(md);
-	const pdfLink = fm ? parsePdfLink(readKey(fm.lines, PDF_KEY)) : null;
-	const fingerprint = fm ? readKey(fm.lines, FINGERPRINT_KEY) || null : null;
+	const pdfLink = fm ? parsePdfLink(readKey(fm.lines, PDF_KEY) ?? readKey(fm.lines, LEGACY_PDF_KEY)) : null;
+	const fingerprint = fm ? readKey(fm.lines, FINGERPRINT_KEY) || readKey(fm.lines, LEGACY_FINGERPRINT_KEY) || null : null;
 	const block = findThreadBlock(md);
 	const threads: PdfThreads = {};
 	if (block) {
@@ -223,7 +228,7 @@ export interface SidecarWrite {
 }
 
 /**
- * The full text of a comment note. Properties other than `pdf` and `pdf-fingerprint` in
+ * The full text of a comment note. Properties other than ours (and their pre-0.2 names) in
  * `existing` are kept as they are; the body is replaced by the digest and the block.
  */
 export function buildSidecar(existing: string | null, w: SidecarWrite): string {
@@ -237,7 +242,7 @@ export function buildSidecar(existing: string | null, w: SidecarWrite): string {
 }
 
 function ownKeyLine(l: string): boolean {
-	return new RegExp(`^(${PDF_KEY}|${FINGERPRINT_KEY.replace(/-/g, '\\-')}):`).test(l);
+	return OWN_KEYS.some((k) => l.startsWith(k + ':'));
 }
 
 /** Indented lines (a YAML list or block) under one of our keys belong to it and are replaced too. */

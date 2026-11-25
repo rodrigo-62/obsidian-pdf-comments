@@ -1,13 +1,13 @@
 // Finding, reading and writing the comment note of each PDF (SPEC §5.1, DECISIONS D3.2–D3.4).
 //
-// The note is tied to its PDF by its `pdf` property (a link), so an index PDF path → note is kept
+// The note is tied to its PDF by its `commented-pdf` property (a link), so an index PDF path → note is kept
 // from Obsidian's metadata cache. A note only counts as a comment note if it also contains the
-// data block: a note of yours that merely has a `pdf` property is never read as one, and never
-// written. Notes are written with `vault.process` from the note's current text, so an edit made
+// data block: a note of yours that merely has such a property (or `pdf`, the name before 0.2) is
+// never read as one, and never written. Notes are written with `vault.process` from the note's current text, so an edit made
 // elsewhere a moment earlier (sync, another device) is not lost.
 
 import { normalizePath, TFile, TFolder, type App } from 'obsidian';
-import { BLOCK_OPEN, buildSidecar, parsePdfLink, parseSidecar, sidecarBody, type PdfThreads } from '../../core/sidecar';
+import { BLOCK_OPEN, buildSidecar, LEGACY_PDF_KEY, parsePdfLink, PDF_KEY, parseSidecar, sidecarBody, type PdfThreads } from '../../core/sidecar';
 import { renderDigest } from '../../core/digest';
 import { normalizeFolder, sidecarPathFor } from '../../core/sidecarName';
 
@@ -60,7 +60,8 @@ export class NoteStore {
 		if (old && this.byPdf.get(old) === file.path) this.byPdf.delete(old);
 		this.pdfOf.delete(file.path);
 		const fm = this.app.metadataCache.getFileCache(file)?.frontmatter;
-		const link = parsePdfLink(typeof fm?.pdf === 'string' ? fm.pdf : null);
+		const raw = fm?.[PDF_KEY] ?? fm?.[LEGACY_PDF_KEY]; // the old name only counts with the data block (commentNote)
+		const link = parsePdfLink(typeof raw === 'string' ? raw : null);
 		if (!link) return null;
 		const pdf = this.app.metadataCache.getFirstLinkpathDest(link, file.path);
 		if (!pdf || pdf.extension !== 'pdf') return null;
@@ -145,7 +146,7 @@ export class NoteStore {
 			let result: PdfThreads = {};
 			let digestEdited = false;
 			const text = await this.app.vault.process(note, (md) => {
-				if (!md.includes(BLOCK_OPEN)) throw new Error(`${note.path} has a "pdf" property but is not a comment note; not changing it`);
+				if (!md.includes(BLOCK_OPEN)) throw new Error(`${note.path} points at a PDF but is not a comment note; not changing it`);
 				const p = parseSidecar(md);
 				if (!p.ok) throw new Error(`${note.path}: ${p.error}`);
 				result = fn(p.data.threads);

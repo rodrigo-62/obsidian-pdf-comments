@@ -35,7 +35,7 @@ Nothing to try in Obsidian: this phase is pure code under `src/core/`, covered b
 Start from `npm run vault:reset` (comment notes of earlier tries are in `test-vault/PDF comments/`; delete them for a clean start).
 
 - **Add a comment:** select text in `Lighthouses.pdf`, right-click → *Add comment* (or the speech-bubble-plus button, or the command). A card with a text box appears in the margin, level with the blue selection. Type, Ctrl+Enter. The text turns yellow; the card stays.
-- **The note:** `PDF comments/Lighthouses.md` appears, with `pdf: "[[PDFs/Lighthouses.pdf]]"`, a readable summary by page, and the data block. Its *Open* link brings you back to the comment.
+- **The note:** `PDF comments/Lighthouses.md` appears, with `commented-pdf: "[[PDFs/Lighthouses.pdf]]"`, a readable summary by page, and the data block. Its *Open* link brings you back to the comment.
 - **Cards:** click a highlight → its card becomes active (and steps out). Reply, reply to a reply (↳ chip), edit, delete, ✓ resolve (the card and highlight disappear; the double-check button shows resolved ones again), priority in the ⋯ menu, tree view.
 - **Across a page break:** select from the end of page 1 into page 2 → one comment highlighted on both pages.
 - **Copy link to selection:** right-click a selection → *Copy link to selection*, paste in a note: `[[PDFs/Lighthouses.pdf#page=…&selection=…|Lighthouses, p.…]]`; clicking it selects the same text (also in Obsidian's viewer).
@@ -47,3 +47,12 @@ Start from `npm run vault:reset` (comment notes of earlier tries are in `test-va
 - **Renaming the PDF** renames its note and updates its `pdf` property.
 - **Your own notes are safe:** a note with a `pdf:` property pointing at a PDF (e.g. a literature note) is not touched when you comment on that PDF; a separate note is made in `PDF comments/`.
 - **Editing the note by hand** (the JSON, e.g. a comment's text): the open PDF shows the change. Editing the summary instead: the next comment overwrites it, with a notice.
+
+## Feedback round 1
+
+- Card borders: every card has a visible edge, the active one a clear amber ring (try an AMOLED/black theme).
+- Settings → PDF Comments: *Sepia paper colour* and *Dark page strength* change open PDFs at once; the reset buttons restore them.
+- With the PDF focused (click a page), select text and press Ctrl+Alt+M: a new comment opens.
+- Hovering a page shows no "Page N" tooltip.
+- Narrow pane: the button reads "💬 N comments".
+- New comment notes have `commented-pdf:`; a note from an earlier build (with `pdf:`) gets the new property on its next change.

@@ -75,3 +75,17 @@ Decisions that fill gaps in, or deviate from, `docs/SPEC.md`. Newest last. Evide
 **D3.9 — Copied from Docs:** cards, composer and menus (`src/obsidian/comments/`), and their CSS, with the prefix `folio-` renamed `pdfc-` so the two plugins' styles can't affect each other. The sidebar's comment search filters threads by quote and comment text; Docs' stepping through individual matches is not ported yet.
 
 **Known, not fixed:** a comment whose selection includes a footnote or page number (across a page break) may become detached when the PDF is replaced by a re-laid-out version (D2.3). Area comments, links to comments in the card menu, and the settings layout are Phase 5.
+
+## Feedback round 1 (after Phase 3)
+
+**F1.1 — Card edges are visible on very dark (AMOLED) themes.** Every card has a 1px border in 28 % of the text colour (50 % on hover; `--pdfc-card-border` overrides it); the active card has a 2px ring in the highlight colour (an opaque amber in dark themes) instead of a faint one.
+
+**F1.2 — The page colours can be adjusted**: settings for the sepia paper colour (colour picker, reset) and the strength of the dark colours (70–100 %, reset). They set `--pdfc-sepia-paper` and `--pdfc-dark-invert` on every PDF view.
+
+**F1.3 — Ctrl+Alt+M adds a comment** while the PDF view has focus. It is a key of the view's own scope, not a default hotkey of the command (Obsidian's guidelines forbid those), so it can't clash with the Docs plugin's Ctrl+Alt+M in notes. The command *Add comment to the selected text* can still get any hotkey.
+
+**F1.4 — No "Page N" tooltip.** PDF.js labels each page for screen readers (`aria-label`), and Obsidian shows every `aria-label` as a tooltip on hover. The labels are removed as soon as PDF.js sets them (a MutationObserver: it sets them again when its translations arrive). The pages keep their `role` and page numbers.
+
+**F1.5 — The narrow-pane button says what it is:** "💬 3 comments", with the tooltip "Too narrow for the comment margin: open the comments in the sidebar".
+
+**F1.6 — The note's properties are `commented-pdf` and `commented-pdf-fingerprint`** instead of `pdf` and `pdf-fingerprint`: `pdf` is a common property name (literature-note templates, other plugins), and a specific name can't be mistaken for theirs or make their tools treat a comment note as one of their own. Notes written with the old names are still read (only if they contain the data block, D3.2) and get the new names on their next save.

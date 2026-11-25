@@ -239,6 +239,11 @@ export default class PdfCommentsPlugin extends Plugin {
 		void this.saveSettings();
 	}
 
+	/** Sepia colour or dark strength changed in the settings. */
+	pageColoursChanged(): void {
+		for (const v of this.ourViews()) v.applyPageTheme();
+	}
+
 	cyclePageTheme(): void {
 		const i = PAGE_THEMES.indexOf(this.settings.pageTheme);
 		this.setPageTheme(PAGE_THEMES[(i + 1) % PAGE_THEMES.length]!);

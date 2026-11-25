@@ -98,7 +98,7 @@ A PDF can't hold `<!--c:ID-->` markers, so comments live **outside** the PDF.
 ### 5.1 Where
 **DECISION (confirmed by me): one Markdown note per PDF, all in one folder**, default `PDF comments/` (a setting). `Papers/Smith 2021.pdf` → `PDF comments/Smith 2021.md`.
 - It's a normal note, so it syncs (Obsidian Sync, git), and agents and backups see it. It is not in a dot-folder (Obsidian Sync skips those). PDF folders stay clean.
-- **The frontmatter link is what ties a note to its PDF**, not the file name: `pdf: "[[Papers/Smith 2021.pdf]]"`. Obsidian updates that link when the PDF is renamed or moved, so the pairing survives without the plugin. Look a PDF's note up through `metadataCache` (an index from PDF path to note, rebuilt on `metadataCache` changes), never by guessing the name.
+- **The frontmatter link is what ties a note to its PDF**, not the file name: `commented-pdf: "[[Papers/Smith 2021.pdf]]"`. Obsidian updates that link when the PDF is renamed or moved, so the pairing survives without the plugin. Look a PDF's note up through `metadataCache` (an index from PDF path to note, rebuilt on `metadataCache` changes), never by guessing the name.
 - Name collisions (two `Smith 2021.pdf` in different folders): the second note gets the PDF's parent folder in its name, `Smith 2021 (Papers-old).md`, then a number if still taken.
 - When a PDF is renamed, the plugin renames its note to match (`vault.on('rename')`, via `app.fileManager.renameFile` so links to the note are updated). A setting can turn that off.
 - When a PDF is deleted, its note is kept (it may hold work); the threads show as detached if the PDF comes back changed.
@@ -113,8 +113,8 @@ The thread JSON uses the Docs format (its `Thread` / `Comment` types, so `core/m
 
 ````
 ---
-pdf: "[[Papers/Smith 2021.pdf]]"
-pdf-fingerprint: "a1b2c3…"
+commented-pdf: "[[Papers/Smith 2021.pdf]]"
+commented-pdf-fingerprint: "a1b2c3…"
 ---
 (generated digest, see below)
 

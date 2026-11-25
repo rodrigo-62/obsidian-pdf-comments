@@ -22,6 +22,10 @@ export interface PdfCommentsSettings {
 	commentsFolder: string;
 	/** Rename a PDF's comment note when the PDF is renamed. */
 	renameNotesWithPdfs: boolean;
+	/** Paper colour of the sepia page colours. */
+	sepiaColor: string;
+	/** Strength of the dark page colours' inversion (0.7–1). */
+	darkInvert: number;
 }
 
 export const DEFAULT_SETTINGS: PdfCommentsSettings = {
@@ -31,6 +35,8 @@ export const DEFAULT_SETTINGS: PdfCommentsSettings = {
 	marginWidth: 320,
 	commentsFolder: 'PDF comments',
 	renameNotesWithPdfs: true,
+	sepiaColor: '#f3e7cf',
+	darkInvert: 0.88,
 };
 
 export function sanitizeSettings(raw: unknown): PdfCommentsSettings {
@@ -44,6 +50,8 @@ export function sanitizeSettings(raw: unknown): PdfCommentsSettings {
 	if (typeof o.marginWidth === 'number' && o.marginWidth >= 200 && o.marginWidth <= 600) s.marginWidth = o.marginWidth;
 	if (typeof o.commentsFolder === 'string') s.commentsFolder = o.commentsFolder;
 	if (typeof o.renameNotesWithPdfs === 'boolean') s.renameNotesWithPdfs = o.renameNotesWithPdfs;
+	if (typeof o.sepiaColor === 'string' && /^#[0-9a-f]{6}$/i.test(o.sepiaColor)) s.sepiaColor = o.sepiaColor;
+	if (typeof o.darkInvert === 'number' && o.darkInvert >= 0.7 && o.darkInvert <= 1) s.darkInvert = o.darkInvert;
 	return s;
 }
 
@@ -88,7 +96,7 @@ export class PdfCommentsSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName('Folder for comment notes')
-			.setDesc('Each commented PDF gets one note here, linked to the PDF by its "pdf" property. Existing notes are not moved when you change this.')
+			.setDesc('Each commented PDF gets one note here, linked to the PDF by its "commented-pdf" property. Existing notes are not moved when you change this.')
 			.addText((t) =>
 				t
 					.setPlaceholder('PDF comments')
@@ -133,5 +141,52 @@ export class PdfCommentsSettingTab extends PluginSettingTab {
 				d.setValue(s.pageTheme);
 				d.onChange((v) => this.plugin.setPageTheme(v as PageTheme));
 			});
+
+		new Setting(containerEl)
+			.setName('Sepia paper colour')
+			.setDesc('The colour white turns into with the sepia page colours. Text stays dark.')
+			.addColorPicker((c) =>
+				c.setValue(s.sepiaColor).onChange(async (v) => {
+					s.sepiaColor = v;
+					await this.plugin.saveSettings();
+					this.plugin.pageColoursChanged();
+				}),
+			)
+			.addExtraButton((b) =>
+				b
+					.setIcon('rotate-ccw')
+					.setTooltip('Reset')
+					.onClick(async () => {
+						s.sepiaColor = DEFAULT_SETTINGS.sepiaColor;
+						await this.plugin.saveSettings();
+						this.plugin.pageColoursChanged();
+						this.display();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName('Dark page strength')
+			.setDesc('How far the dark page colours go: lower gives grey pages with softer text, 100 % gives black pages with white text.')
+			.addSlider((sl) =>
+				sl
+					.setLimits(70, 100, 1)
+					.setValue(Math.round(s.darkInvert * 100))
+					.onChange(async (v) => {
+						s.darkInvert = v / 100;
+						await this.plugin.saveSettings();
+						this.plugin.pageColoursChanged();
+					}),
+			)
+			.addExtraButton((b) =>
+				b
+					.setIcon('rotate-ccw')
+					.setTooltip('Reset')
+					.onClick(async () => {
+						s.darkInvert = DEFAULT_SETTINGS.darkInvert;
+						await this.plugin.saveSettings();
+						this.plugin.pageColoursChanged();
+						this.display();
+					}),
+			);
 	}
 }

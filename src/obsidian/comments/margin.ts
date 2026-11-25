@@ -63,7 +63,7 @@ export class Margin {
 		this.layer.hide();
 		this.detachedEl = this.layer.createDiv({ cls: 'pdfc-detached-header', text: 'Detached comments' });
 		this.detachedEl.hide();
-		this.narrowBtn = host.mainEl.createDiv({ cls: 'pdfc-narrow-btn', attr: { 'aria-label': 'Open the comments in the sidebar' } });
+		this.narrowBtn = host.mainEl.createDiv({ cls: 'pdfc-narrow-btn', attr: { 'aria-label': 'Too narrow for the comment margin: open the comments in the sidebar' } });
 		this.narrowBtn.hide();
 		this.narrowBtn.addEventListener('click', () => host.openSidebar());
 		// Clicks and keys in cards are not clicks on the pages.
@@ -97,7 +97,8 @@ export class Margin {
 		this.wide = this.computeWide();
 		this.setShown(active && this.wide);
 		this.narrowBtn.toggle(active && !this.wide);
-		this.narrowBtn.setText(`💬 ${data.anchored.length + data.detached.length}`);
+		const n = data.anchored.length + data.detached.length;
+		this.narrowBtn.setText(`💬 ${n} comment${n === 1 ? '' : 's'}`);
 		if (!active) {
 			for (const c of this.cards.values()) c.destroy();
 			this.cards.clear();

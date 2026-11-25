@@ -9,7 +9,7 @@ body {
 	--pdfc-hl-line: rgba(220, 160, 0, 0.95);
 	--pdfc-hl-draft: rgba(80, 140, 255, 0.25);
 	--pdfc-hl-resolved: rgba(128, 128, 128, 0.18);
-	--pdfc-active-outline: color-mix(in srgb, var(--pdfc-hl-line) 60%, transparent);
+	--pdfc-active-outline: var(--pdfc-hl-line);
 }
 body.theme-dark {
 	--pdfc-hl-bg: rgba(255, 205, 60, 0.24);
@@ -18,7 +18,8 @@ body.theme-dark {
 	--pdfc-hl-draft: rgba(100, 160, 255, 0.28);
 	--pdfc-hl-resolved: rgba(160, 160, 160, 0.16);
 	/* softer, more pastel outline for the active card on dark backgrounds */
-	--pdfc-active-outline: color-mix(in srgb, rgb(240, 215, 150) 38%, transparent);
+	/* clearly visible on very dark (AMOLED) themes too */
+	--pdfc-active-outline: rgba(255, 205, 60, 0.9);
 }
 
 
@@ -213,7 +214,8 @@ body.theme-dark {
 .pdfc-card {
 	box-sizing: border-box;
 	background: color-mix(in srgb, var(--background-primary) 93%, var(--text-normal) 7%);
-	border: 1px solid transparent;
+	/* a visible edge for every card (DECISIONS F1.1): very dark themes have almost no contrast between card and background */
+	border: 1px solid var(--pdfc-card-border, color-mix(in srgb, var(--text-normal) 28%, transparent));
 	border-radius: 8px;
 	padding: 6px 10px 8px;
 	font-family: var(--font-interface);
@@ -224,15 +226,15 @@ body.theme-dark {
 	text-align: left;
 }
 .pdfc-card:hover {
-	border-color: var(--background-modifier-border);
+	border-color: color-mix(in srgb, var(--text-normal) 50%, transparent);
 }
 .pdfc-card.is-active {
 	cursor: default;
 	z-index: 2;
 	background: var(--background-primary);
-	/* a soft outline in the highlight colour: visible in dark themes too, where shadows aren't */
+	/* a 2px ring in the highlight colour: visible in dark themes too, where shadows aren't */
 	border-color: var(--pdfc-active-outline);
-	box-shadow: 0 4px 18px rgba(0, 0, 0, 0.22), 0 1px 4px rgba(0, 0, 0, 0.14);
+	box-shadow: 0 0 0 1px var(--pdfc-active-outline), 0 4px 18px rgba(0, 0, 0, 0.22), 0 1px 4px rgba(0, 0, 0, 0.14);
 }
 /* the active margin card steps out towards the text, like in Google Docs */
 .pdfc-margin > .pdfc-card.is-active {
