@@ -59,7 +59,7 @@ export class NoteStore {
 		const old = this.pdfOf.get(file.path);
 		if (old && this.byPdf.get(old) === file.path) this.byPdf.delete(old);
 		this.pdfOf.delete(file.path);
-		const fm = this.app.metadataCache.getFileCache(file)?.frontmatter;
+		const fm = this.app.metadataCache.getFileCache(file)?.frontmatter as Record<string, unknown> | undefined;
 		const raw = fm?.[PDF_KEY] ?? fm?.[LEGACY_PDF_KEY]; // the old name only counts with the data block (commentNote)
 		const link = parsePdfLink(typeof raw === 'string' ? raw : null);
 		if (!link) return null;
