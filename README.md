@@ -20,6 +20,7 @@ It is the sister plugin of **Docs** (margin comments for Markdown notes) and use
 - A selection can run across a page break.
 - *Go to next / previous comment*, *Show resolved comments*, a comments sidebar with search (also used when the pane is too narrow for the margin: a "💬 N comments" button opens it).
 - **Copy link to selection** (Obsidian's own `#page=…&selection=…` format) and **Copy link to comment**.
+- **Copy without line breaks** (Ctrl+Shift+C, or in the right-click and highlight menus): the selection as running text, without the PDF's line breaks.
 
 **Highlights**
 - Select text, then **Ctrl+Alt+H**, the highlighter button, or right-click → *Highlight* (yellow, green, blue, pink or purple; the last colour is remembered).

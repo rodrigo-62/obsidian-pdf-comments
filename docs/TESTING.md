@@ -77,3 +77,4 @@ Start from `npm run vault:reset` (comment notes of earlier tries are in `test-va
 - The comment note lists highlights ("Highlight (green)"); Copy for LLM shows them as `==text==`.
 
 - Right-click a selection spanning several lines → *Copy without line breaks*; paste: one line of text, words split at a line end joined (where the PDF keeps the hyphen).
+- Select lines and press Ctrl+Shift+C (focus in the PDF): same result. Click a highlight → *Copy without line breaks*.

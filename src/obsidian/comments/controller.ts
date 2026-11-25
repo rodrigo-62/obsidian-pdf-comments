@@ -488,6 +488,12 @@ export class CommentsController {
 		);
 		menu.addItem((i) =>
 			i
+				.setTitle('Copy without line breaks')
+				.setIcon('wrap-text')
+				.onClick(() => void navigator.clipboard.writeText(unwrap(t.quote)).then(() => new Notice('Copied without line breaks'))),
+		);
+		menu.addItem((i) =>
+			i
 				.setTitle('Remove highlight')
 				.setIcon('eraser')
 				.setWarning(true)

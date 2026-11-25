@@ -98,6 +98,10 @@ export class PdfCommentsView extends FileView {
 			void this.comments?.addComment();
 			return false;
 		});
+		this.scope.register(['Mod', 'Shift'], 'c', () => {
+			void this.comments?.copyWithoutLineBreaks();
+			return false;
+		});
 		this.scope.register(['Mod', 'Alt'], 'h', () => {
 			void this.comments?.highlightSelection();
 			return false;
