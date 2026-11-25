@@ -75,3 +75,5 @@ Start from `npm run vault:reset` (comment notes of earlier tries are in `test-va
 - Right-click a selection: *Highlight* (last colour) and *Highlight in …* for the others.
 - Click a highlight: change its colour, *Add comment* (it becomes a comment with a card, keeping its colour), *Copy link to this highlight*, *Copy text*, *Remove highlight*.
 - The comment note lists highlights ("Highlight (green)"); Copy for LLM shows them as `==text==`.
+
+- Right-click a selection spanning several lines → *Copy without line breaks*; paste: one line of text, words split at a line end joined (where the PDF keeps the hyphen).

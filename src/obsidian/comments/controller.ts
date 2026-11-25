@@ -8,7 +8,7 @@ import { generateId } from '../../core/ids';
 import { addReply, createThread, deleteComment, editComment, setPriority, setResolved, type Priority } from '../../core/shared/model';
 import { HIGHLIGHT_COLORS, isHighlight, threadAnchor, threadColor, type HighlightColor, type PdfThread, type PdfThreads } from '../../core/sidecar';
 import { formatPdfSubpath } from '../../core/subpath';
-import { areaTextOffset, exportPdfForLLM, exportSummary, pagesNeeded, type PdfExportOptions } from '../../core/llmExport';
+import { areaTextOffset, exportPdfForLLM, exportSummary, pagesNeeded, unwrap, type PdfExportOptions } from '../../core/llmExport';
 import { CopyForLlmModal, type LlmChoice } from './llmModal';
 import type { CardHost } from './card';
 import type { CommentDoc } from './commentDoc';
@@ -401,6 +401,17 @@ export class CommentsController {
 		this.render();
 	}
 
+	/** Copies the selection as running text: PDF line breaks become spaces, words split at a line end are joined (DECISIONS H2.1). */
+	async copyWithoutLineBreaks(): Promise<void> {
+		const text = this.host.pagesEl.win.getSelection()?.toString() ?? '';
+		if (!text.trim()) {
+			new Notice('Select some text in the PDF first.');
+			return;
+		}
+		await navigator.clipboard.writeText(unwrap(text));
+		new Notice('Copied without line breaks');
+	}
+
 	async copyLinkToSelection(): Promise<void> {
 		const file = this.pdfPath ? this.host.app.vault.getFileByPath(this.pdfPath) : null;
 		const r = await selectionRef(this.selHost);
@@ -638,6 +649,13 @@ export class CommentsController {
 					const text = this.host.pagesEl.win.getSelection()?.toString() ?? '';
 					void navigator.clipboard.writeText(text);
 				}),
+		);
+		menu.addItem((i) =>
+			i
+				.setTitle('Copy without line breaks')
+				.setIcon('wrap-text')
+				.setSection('copy')
+				.onClick(() => void this.copyWithoutLineBreaks()),
 		);
 		showMenu(menu, e);
 	}
