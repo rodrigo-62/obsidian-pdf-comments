@@ -7,7 +7,7 @@ A PDF view for Obsidian with Google-Docs-like margin comments. Sister project of
 ## Working rules
 
 - Work in the phases of SPEC §10, one at a time; stop after each with a short report.
-- **Never touch any vault or file outside this repo** (reading the Docs repo to copy code is fine; never write to it). Test only in `test-vault/`.
+- **Never touch any vault or file outside this repo** (reading the Docs repo to copy code is fine; never write to it). Test only in `test-vault/`. Never run `npm run update-vaults` or `install-plugin`: they write to the user's real vaults (`.install-targets`); only the user runs them.
 - `src/core/` is pure TypeScript with no `obsidian` or pdf.js import, unit-tested with vitest.
 - Load PDFs with `app.vault.readBinary` → `getDocument({ data })`, never through `app://` resource URLs (SPEC §2.1).
 - Sidecar notes are written with `app.vault.process`, never raw `modify` on stale content.

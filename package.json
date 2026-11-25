@@ -13,7 +13,9 @@
 		"typecheck": "tsc -noEmit -skipLibCheck",
 		"version": "node version-bump.mjs && git add manifest.json versions.json",
 		"vault:reset": "node scripts/build-test-vault.mjs",
-		"lint": "eslint ."
+		"lint": "eslint .",
+		"install-plugin": "node scripts/install-plugin.mjs",
+		"update-vaults": "npm run build && node scripts/update-vaults.mjs"
 	},
 	"license": "MIT",
 	"devDependencies": {
