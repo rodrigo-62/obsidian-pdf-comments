@@ -72,7 +72,7 @@ Checked in Obsidian 1.10.3 (installer) / 1.15.1 (app):
 - Outline (table of contents) from `doc.getOutline()` in a dropdown or the right sidebar. Thumbnails: later.
 - Links inside the PDF (internal destinations and external URLs) via `PDFLinkService`. External URLs open in the browser.
 - Remember the scroll position and zoom per file (in plugin data, keyed by path; follow renames).
-- **Dark mode:** pages stay white by default. A toggle (and a setting for the default) inverts the pages with a CSS filter, like Obsidian's own option, which keeps images recognisable with `hue-rotate(180deg)`.
+- **Page colours:** normal, sepia or dark, for all PDFs at once (toolbar, setting, commands). Only the rendered pages are recoloured (DECISIONS D3.1).
 - Password-protected PDFs: prompt for the password (PDF.js `onPassword`).
 
 ## 4. Comments: UX
@@ -89,6 +89,7 @@ The same as Docs (its SPEC §5.1, §5.5 and DECISIONS) unless stated here:
 - **Detached comments:** if an anchor can't be found any more (the PDF file was replaced by a different version, §5.3), the thread goes under "Detached comments" at the bottom of the margin, showing its quote and page.
 - **Narrow pane:** below a width threshold, cards move to a comments sidebar (`ItemView`), as in Docs.
 - **Copy link to comment:** `[[paper.pdf#page=12&comment=k3f9]]`, to paste into my notes.
+- **Copy link to selection:** right-click a selection, as in Obsidian's own viewer (Obsidian's link format; DECISIONS D3.7).
 
 ## 5. Storage
 
@@ -147,7 +148,7 @@ pdf-fingerprint: "a1b2c3…"
 - `page` is 1-based. `rects` are in **PDF user-space units** of that page (`[x1, y1, x2, y2]`, origin bottom-left, as in PDF), so they don't depend on zoom. Highlights and card positions are computed from them.
 - `start` / `end` are offsets into that page's **normalised text** (§5.3). `quote` + `prefix` + `suffix` form a text-quote selector, as in Hypothes.is.
 - Area anchors have `area: true`, rects only, and an empty quote.
-- `pdf-fingerprint` is `pdfDocument.fingerprints[0]` when the sidecar was last written.
+- `pdf-fingerprint` is a hash of the PDF file when the sidecar was last written (DECISIONS D3.3).
 - Escaping of `-->` in bodies, pretty-printed JSON, unknown keys preserved: exactly as Docs' `threadStore`.
 - **Digest (confirmed by me):** above the block, a generated Markdown digest so the note is readable in Obsidian and shows up in search. The JSON stays authoritative; the digest is rewritten from it on every save, and never parsed.
   - A first line: `> Generated from the comments on [[Papers/Smith 2021.pdf]]. Edits here are overwritten; comment in the PDF view.`

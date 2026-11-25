@@ -20,7 +20,7 @@ Enable "PDF Comments" in the test vault (`npm run build` first).
 - **Find:** Ctrl+F (or the magnifier) with a word selected pre-fills it; Enter / Shift+Enter, match case, whole words, "3 of 10", Esc closes and removes the highlights.
 - **Outline:** the list icon; click "II. The lens" in `Lighthouses.pdf`; the long book's 50 chapters.
 - **Links inside the PDF:** the contents entries and "the section on the lens" jump; "example.org" on the last page opens the browser.
-- **Dark pages:** the moon inverts the pages (the figure in `Two-column paper.pdf` keeps its yellow/orange hues). Setting for the default.
+- **Page colours:** the sun/coffee/moon button: normal, sepia, dark (the figure in `Two-column paper.pdf` keeps its yellow/orange hues). All open PDFs change; the choice is remembered.
 - **Password:** `Protected (password test).pdf` asks; a wrong password asks again; Cancel shows "This PDF is protected by a password" with *Enter password*.
 - **Memory:** scroll `Long book.pdf` to some page at 125 %, close the tab, reopen: same page and zoom. Rename the PDF: still remembered.
 - **Disable the plugin** with PDFs open: the tabs switch to Obsidian's viewer at the same page; enable it again: they come back.
@@ -29,3 +29,21 @@ Enable "PDF Comments" in the test vault (`npm run build` first).
 ## Phase 2 (anchor and storage core)
 
 Nothing to try in Obsidian: this phase is pure code under `src/core/`, covered by `npm test` (77 tests, many on the real text of the test PDFs in `tests/fixtures/`). Its results become visible in Phase 3.
+
+## Phase 3 (comments)
+
+Start from `npm run vault:reset` (comment notes of earlier tries are in `test-vault/PDF comments/`; delete them for a clean start).
+
+- **Add a comment:** select text in `Lighthouses.pdf`, right-click → *Add comment* (or the speech-bubble-plus button, or the command). A card with a text box appears in the margin, level with the blue selection. Type, Ctrl+Enter. The text turns yellow; the card stays.
+- **The note:** `PDF comments/Lighthouses.md` appears, with `pdf: "[[PDFs/Lighthouses.pdf]]"`, a readable summary by page, and the data block. Its *Open* link brings you back to the comment.
+- **Cards:** click a highlight → its card becomes active (and steps out). Reply, reply to a reply (↳ chip), edit, delete, ✓ resolve (the card and highlight disappear; the double-check button shows resolved ones again), priority in the ⋯ menu, tree view.
+- **Across a page break:** select from the end of page 1 into page 2 → one comment highlighted on both pages.
+- **Copy link to selection:** right-click a selection → *Copy link to selection*, paste in a note: `[[PDFs/Lighthouses.pdf#page=…&selection=…|Lighthouses, p.…]]`; clicking it selects the same text (also in Obsidian's viewer).
+- **Navigation:** commands *Go to next / previous comment* walk through the comments in reading order.
+- **Narrow pane:** make the PDF pane narrow (or open a sidebar): the margin hides and "💬 N" appears top right; it opens the comments sidebar. A new comment is then written in a small window.
+- **Sidebar:** the panel-right button: all comments of the PDF in order, with quotes; search filters them; clicking a card scrolls the PDF there.
+- **Page colours:** sepia and dark with comments: highlights stay visible.
+- **A changed PDF:** comment on `Lighthouses.pdf`, then replace the file with `Lighthouses (revised).pdf` (copy it over the original in your file manager). A notice says how many comments moved with their text and how many were not found ("Detached comments" at the bottom of the margin).
+- **Renaming the PDF** renames its note and updates its `pdf` property.
+- **Your own notes are safe:** a note with a `pdf:` property pointing at a PDF (e.g. a literature note) is not touched when you comment on that PDF; a separate note is made in `PDF comments/`.
+- **Editing the note by hand** (the JSON, e.g. a comment's text): the open PDF shows the change. Editing the summary instead: the next comment overwrites it, with a notice.

@@ -20,8 +20,9 @@ A PDF view for Obsidian with Google-Docs-like margin comments. Sister project of
 - The user chose to keep building despite Annotator 0.3 (2026-11-25).
 - **Phase 1 done** (viewer, DECISIONS D1.1–D1.9): `src/obsidian/pdfView.ts` (FileView on PDF.js viewer components), `findBar.ts`, `outlinePanel.ts`, `passwordModal.ts`, `settings.ts`, `main.ts` (open-by-default patch, switch buttons, commands, hand-back on disable); core `subpath.ts`, `zoom.ts`, `viewStates.ts` with tests.
 - **Phase 2 done** (DECISIONS D2.1–D2.8): `src/core/pageText.ts`, `anchor.ts`, `quote.ts`, `reanchor.ts`, `sidecar.ts`, `digest.ts`, `sidecarName.ts`; Docs modules in `src/core/shared/`; fixtures from real PDF.js output in `tests/fixtures/` (regenerate with `node scripts/extract-text-fixture.mjs` after `npm run vault:reset`). 77 tests.
-- **Next:** Phase 3 (comments UI).
-- Harness notes: background tabs are *deferred* (`leaf.isDeferred`, `iterateAllLeaves` skips them; walk `workspace.rootSplit` instead). Obsidian 1.15 modals have no `.modal-close-button`. The plugin loaded at harness start is the build at that moment; reload it with disablePlugin/enablePlugin after a rebuild.
+- **Phase 3 done** (DECISIONS D3.1–D3.9): `src/obsidian/comments/` (noteStore, commentDoc, controller, highlights, margin, selection, pageTexts, sidebarView, and card/composer/menus from Docs), `src/styles/comments.css`; page colours normal/sepia/dark (user request); "Copy link to selection" (side-agent note).
+- **Next:** Phase 4 (Copy for LLM).
+- Harness notes: background tabs are *deferred* (`leaf.isDeferred`, `iterateAllLeaves` skips them; walk `workspace.rootSplit` instead). Obsidian 1.15 modals have no `.modal-close-button`. Renames in the harness trigger Obsidian's "Update links?" dialog unless `app.vault.setConfig('alwaysUpdateLinks', true)` is set first. The plugin loaded at harness start is the build at that moment; reload it with disablePlugin/enablePlugin after a rebuild.
 
 ## Commands (inside `nix develop`)
 

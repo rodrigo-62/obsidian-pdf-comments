@@ -53,3 +53,25 @@ Decisions that fill gaps in, or deviate from, `docs/SPEC.md`. Newest last. Evide
 **D2.7 — `detached` is stored.** When re-anchoring can't find a quote, the thread keeps its old anchor and gets `"detached": true`, so the digest lists it under "Detached" and the next re-anchoring can bring it back (which clears the mark). Area anchors on a changed PDF get `"pdfChanged": true` on the anchor.
 
 **D2.8 — Fixtures from real PDF.js output.** `scripts/extract-text-fixture.mjs` writes the text items of three test PDFs to `tests/fixtures/*.json` (committed, ~200 kB) using `pdfjs-dist` 5.3.31 in Node. The test of Obsidian's `selection=5,2,11,5` against these items gives exactly the text Obsidian's own viewer selected, so the Node items match Obsidian's.
+
+## Phase 3 (comments UI)
+
+**D3.1 — Page colours: normal, sepia, dark (asked for by the user).** One setting for all PDF views (toolbar menu, settings, commands), replacing the dark-pages toggle (an old `darkPages: true` becomes `dark`). Only what PDF.js painted is recoloured, so highlights, the text layer and the cards keep their colours: sepia multiplies a warm paper tone (`--pdfc-sepia-paper`, #f3e7cf) over the canvas, so white becomes paper and black stays black; dark inverts the canvas to soft greys (`invert(0.88)`, `--pdfc-dark-invert`) with `hue-rotate(180deg)` so pictures keep their hues. Both variables can be changed with a CSS snippet. On dark pages highlights are plain translucent colour, since `multiply` would hide them.
+
+**D3.2 — Which note is a PDF's comment note.** An index PDF path → note is kept from Obsidian's metadata cache (`pdf` property, resolved as a link). A note counts only if it also contains the data block: a note of the user's that merely has a `pdf` property (e.g. a literature note) is never read or written as a comment note; it is set aside and a comment note is created in the comments folder. If two comment notes point at one PDF, the one in the comments folder wins. The plugin recognises its own writes by their text, so other changes (sync, editing the note by hand) reload the comments in open views.
+
+**D3.3 — Fingerprint = SHA-256 of the file** (first 16 hex digits), not `pdfDocument.fingerprints[0]` as SPEC §5.2 said. The PDF `/ID` is meant to stay the same across revisions of a document and is missing in some files, so it can't tell that a PDF was replaced. Hashing the bytes already read costs a few milliseconds.
+
+**D3.4 — Renames and empty notes.** When a PDF is renamed, its note's `pdf` property is rewritten (harmless if Obsidian already updated the link) and, if the note is in the comments folder and the setting is on, the note is renamed with `fileManager.renameFile`, so links to it follow (Obsidian may ask whether to update links, following its own setting). A note whose last comment is deleted is kept, with an empty data block: the plugin never deletes files by itself.
+
+**D3.5 — The margin** is a layer in the PDF's scroll area, right of the current page, cards placed with Docs' `layoutCards`. It takes room only while the PDF has visible comments or a comment is being written (D1.7), and only if at least 440 px remain for the pages; otherwise a "💬 N" button opens the comments sidebar and a new comment is written in a modal. When the pages are zoomed wider than the pane, the cards stay beside the page and the view scrolls sideways (as in Google Docs) rather than covering the text.
+
+**D3.6 — Highlights** are an overlay per page, inserted below the text layer (so text stays selectable), with rectangles in percent of the page (zoom needs no work; PDF.js re-renders pages, and the layer is redrawn on `pagerendered`). Clicks and hovers are matched against the rectangles in code; clicking again where comments overlap goes to the next one.
+
+**D3.7 — "Copy link to selection" is in Phase 3** (a side-agent note pointed out that taking over every PDF removed Obsidian's own command). Right-click a selection: *Add comment*, *Copy link to selection*, *Copy*; also commands. The link is Obsidian's `#page=N&selection=a,b,c,d` format, made with `fileManager.generateMarkdownLink` (so it follows the user's link settings), with the alias "Name, p.N" like Obsidian's. Obsidian's format covers one page, so for a selection across pages the link covers the first page's part.
+
+**D3.8 — Reading order** (next/previous comment, the digest, the sidebar): by page, then text comments by their place in the page text, which follows the PDF's content order (the left column before the right one on a two-column page); areas by position.
+
+**D3.9 — Copied from Docs:** cards, composer and menus (`src/obsidian/comments/`), and their CSS, with the prefix `folio-` renamed `pdfc-` so the two plugins' styles can't affect each other. The sidebar's comment search filters threads by quote and comment text; Docs' stepping through individual matches is not ported yet.
+
+**Known, not fixed:** a comment whose selection includes a footnote or page number (across a page break) may become detached when the PDF is replaced by a re-laid-out version (D2.3). Area comments, links to comments in the card menu, and the settings layout are Phase 5.
