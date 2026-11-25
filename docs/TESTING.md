@@ -25,3 +25,7 @@ Enable "PDF Comments" in the test vault (`npm run build` first).
 - **Memory:** scroll `Long book.pdf` to some page at 125 %, close the tab, reopen: same page and zoom. Rename the PDF: still remembered.
 - **Disable the plugin** with PDFs open: the tabs switch to Obsidian's viewer at the same page; enable it again: they come back.
 - **Electron 40** (the unpatched nixpkgs Obsidian): PDFs show in this view although Obsidian's own viewer is blank.
+
+## Phase 2 (anchor and storage core)
+
+Nothing to try in Obsidian: this phase is pure code under `src/core/`, covered by `npm test` (77 tests, many on the real text of the test PDFs in `tests/fixtures/`). Its results become visible in Phase 3.

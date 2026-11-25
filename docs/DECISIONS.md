@@ -35,3 +35,21 @@ Decisions that fill gaps in, or deviate from, `docs/SPEC.md`. Newest last. Evide
 **D1.9 — Position per PDF in plugin data.** Page, top-left point and zoom, keyed by path, at most 300 PDFs (least recently used dropped), following renames and deletes. A PDF changed on disk is reloaded at the same position.
 
 **Known, not fixed:** PDF.js logs `#injectLinkAnnotations: … render method must be called before …` when pages are scrolled past while rendering (its link auto-detection; Obsidian's viewer has the same setting and the same message). Popout windows are untested. Thumbnails are not in v1.
+
+## Phase 2 (anchor and storage core)
+
+**D2.1 — Shared code is copied from Docs** into `src/core/shared/` (`model.ts`, `layout.ts`, `textFormat.ts` unchanged; `search.ts` with only the two helpers that don't need Markdown markers), each with a header naming the Docs file and commit `13957fe`, plus Docs' tests for them in `tests/shared/`. Docs' `threadStore.ts` was adapted into `sidecar.ts` (same JSON layout, escaping and "unknown fields are kept" rule) rather than copied, because the comment note is generated as a whole and has no inline markers.
+
+**D2.2 — Re-anchoring ignores whitespace altogether.** Typst (and other producers) drop the hyphen of a word split at a line or page end ("The improve" / "ment was real"), so a quote and its re-laid-out text differ in where line breaks fall, not just in how many. The normalised form leaves out all whitespace (also drops line-end hyphens between letters and soft hyphens, unfolds ligatures with NFKC, folds typographic quotes and dashes). Repeated passages ("Lorem ipsum…" occurs twice) are told apart by up to 32 characters of prefix and suffix, then by the page nearest to the old one. Exact matches first; case is ignored only if there is none. No fuzzy matching in v1: a quote whose words changed becomes detached.
+
+**D2.3 — Cross-page anchors are re-found part by part if needed.** A selection across a page break includes whatever the PDF has in between (footnotes, page numbers), so the whole quote is tried first, and if it isn't found, each page's part is found in order. The parts are cut from the quote using the stored offsets (the quote is always the segments' texts joined by a line break, so their lengths add up). A part that itself contains page furniture can still fail after a re-layout; such threads become detached.
+
+**D2.4 — Rectangles after re-anchoring come from text-item geometry** (`rectsFromItems`: equal-width characters within an item, 0.2 of the font height below the baseline to 0.8 above). Rectangles of new comments come from the DOM selection (Phase 3), which is exact. Rectangles are stored rounded to 0.1 PDF unit.
+
+**D2.5 — The comment note is written as a whole.** `buildSidecar` keeps every property line except `pdf` and `pdf-fingerprint` (and lines indented under them) exactly as written, then writes the digest and the block. This is one atomic `vault.process` in Phase 3 instead of `processFrontMatter` plus a body write. Values are written as JSON strings, which are valid YAML double-quoted scalars.
+
+**D2.6 — Digest dates are UTC**, like Docs' export, so the digest is the same on every machine and an unchanged digest is recognised as unchanged (the "you edited the digest" notice must not fire because of a time zone).
+
+**D2.7 — `detached` is stored.** When re-anchoring can't find a quote, the thread keeps its old anchor and gets `"detached": true`, so the digest lists it under "Detached" and the next re-anchoring can bring it back (which clears the mark). Area anchors on a changed PDF get `"pdfChanged": true` on the anchor.
+
+**D2.8 — Fixtures from real PDF.js output.** `scripts/extract-text-fixture.mjs` writes the text items of three test PDFs to `tests/fixtures/*.json` (committed, ~200 kB) using `pdfjs-dist` 5.3.31 in Node. The test of Obsidian's `selection=5,2,11,5` against these items gives exactly the text Obsidian's own viewer selected, so the Node items match Obsidian's.

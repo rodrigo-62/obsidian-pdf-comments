@@ -19,7 +19,8 @@ A PDF view for Obsidian with Google-Docs-like margin comments. Sister project of
 - **Phase 0 done** (2026-11-25): scaffold, test vault (`npm run vault:reset`, Typst + qpdf), harness (`scripts/obsidian-headless.sh`, port 9335, `OBSIDIAN_ELECTRON` for Electron 40 checks), research (`docs/RESEARCH.md`), decisions D0.1–D0.5.
 - The user chose to keep building despite Annotator 0.3 (2026-11-25).
 - **Phase 1 done** (viewer, DECISIONS D1.1–D1.9): `src/obsidian/pdfView.ts` (FileView on PDF.js viewer components), `findBar.ts`, `outlinePanel.ts`, `passwordModal.ts`, `settings.ts`, `main.ts` (open-by-default patch, switch buttons, commands, hand-back on disable); core `subpath.ts`, `zoom.ts`, `viewStates.ts` with tests.
-- **Next:** Phase 2 (anchor and storage core).
+- **Phase 2 done** (DECISIONS D2.1–D2.8): `src/core/pageText.ts`, `anchor.ts`, `quote.ts`, `reanchor.ts`, `sidecar.ts`, `digest.ts`, `sidecarName.ts`; Docs modules in `src/core/shared/`; fixtures from real PDF.js output in `tests/fixtures/` (regenerate with `node scripts/extract-text-fixture.mjs` after `npm run vault:reset`). 77 tests.
+- **Next:** Phase 3 (comments UI).
 - Harness notes: background tabs are *deferred* (`leaf.isDeferred`, `iterateAllLeaves` skips them; walk `workspace.rootSplit` instead). Obsidian 1.15 modals have no `.modal-close-button`. The plugin loaded at harness start is the build at that moment; reload it with disablePlugin/enablePlugin after a rebuild.
 
 ## Commands (inside `nix develop`)

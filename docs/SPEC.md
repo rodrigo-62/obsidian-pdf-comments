@@ -184,9 +184,11 @@ Same idea and the same notation as Docs (milestone markers `⟦cN⟧…⟦/cN⟧
 ```
 src/
   core/                    # pure TS, no 'obsidian' or pdf.js import, unit-tested
-    shared/                # copied from Docs (§8): model.ts, layout.ts, search.ts, textFormat.ts, threadRender.ts
-    pageText.ts            # text items -> normalised page text, item/offset <-> page offset
-    anchor.ts              # Anchor types, rect merge, quote search, re-anchoring
+    shared/                # copied from Docs (§8): model.ts, layout.ts, search.ts, textFormat.ts (threadRender.ts in Phase 4)
+    pageText.ts            # text items -> page text, item/offset <-> page offset
+    anchor.ts              # Anchor types and validation, rects (merge, CSS <-> PDF, from item geometry), order, context
+    quote.ts               # normalised quote search (re-anchoring of one anchor)
+    reanchor.ts            # re-anchoring all threads of a note against a changed PDF
     sidecar.ts             # parse/serialise the sidecar note (frontmatter + thread block)
     digest.ts              # threads -> readable Markdown digest
     sidecarName.ts         # PDF path -> note path in the comments folder, collisions
