@@ -1,0 +1,26 @@
+# PDF Comments (working name) — Obsidian plugin
+
+A PDF view for Obsidian with Google-Docs-like margin comments. Sister project of the Docs plugin (`/home/parrhasius/code/projects/obsidian-docs-plugin`), whose comment code is reused here.
+
+**`docs/SPEC.md` is the source of truth.** Read it before changing behaviour. Decisions that deviate from or fill gaps in the spec go in `docs/DECISIONS.md` (create it when the first one is made), with a reason.
+
+## Working rules
+
+- Work in the phases of SPEC §10, one at a time; stop after each with a short report.
+- **Never touch any vault or file outside this repo** (reading the Docs repo to copy code is fine; never write to it). Test only in `test-vault/`.
+- `src/core/` is pure TypeScript with no `obsidian` or pdf.js import, unit-tested with vitest.
+- Load PDFs with `app.vault.readBinary` → `getDocument({ data })`, never through `app://` resource URLs (SPEC §2.1).
+- Sidecar notes are written with `app.vault.process`, never raw `modify` on stale content.
+- Look at the real UI in the headless harness (SPEC §11) before saying something works.
+
+## Status
+
+- Spec drafted (2026-11-25); the user answered storage (one folder), default view (yes) and digest (yes). Only the name is still open.
+- **Phase 0 done** (2026-11-25): scaffold, test vault (`npm run vault:reset`, Typst + qpdf), harness (`scripts/obsidian-headless.sh`, port 9335, `OBSIDIAN_ELECTRON` for Electron 40 checks), research (`docs/RESEARCH.md`), decisions D0.1–D0.5.
+- **Next:** waiting for the user to decide whether to keep building given Annotator 0.3 (RESEARCH §4). If yes: Phase 1 (viewer).
+
+## Commands (inside `nix develop`)
+
+- `npm run build`, `npm test`, `npm run lint`, `npm run dev` (watch into `test-vault/.obsidian/plugins/pdf-comments/`)
+- `npm run vault:reset`: regenerate the sample PDFs from `scripts/vault-src/*.typ`
+- Harness: `OBSIDIAN_ASAR=.scratch/obsidian-1.15.1.asar scripts/obsidian-headless.sh` (background), then `node scripts/cdp.mjs q.js [shot.png]`; stop with `pkill -f "remote-debugging-por[t]=9335"`. The vault copy is recreated on each start.

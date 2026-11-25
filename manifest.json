@@ -1,0 +1,10 @@
+{
+	"id": "pdf-comments",
+	"name": "PDF Comments",
+	"version": "0.1.0",
+	"minAppVersion": "1.8.0",
+	"description": "Read PDFs with Google-Docs-like comments in the margin, with threaded replies; copy a PDF with its comments for an AI agent.",
+	"author": "Rodrigo Monteiro",
+	"authorUrl": "https://github.com/rodrigo-62",
+	"isDesktopOnly": true
+}
