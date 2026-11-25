@@ -1,10 +1,13 @@
 // PDF Comments: plugin entry (SPEC §3, §7).
 
-import { FileView, Plugin, TFile, WorkspaceLeaf, debounce, type ViewState } from 'obsidian';
+import { FileView, Notice, Plugin, TFile, WorkspaceLeaf, debounce, type ViewState } from 'obsidian';
 import { around } from 'monkey-around';
 import { deleteViewState, putViewState, renameViewState, sanitizeViewStates, type FileViewState, type ViewStateMap } from '../core/viewStates';
 import { PdfCommentsView, VIEW_TYPE } from './pdfView';
-import { DEFAULT_SETTINGS, PdfCommentsSettingTab, sanitizeSettings, type PdfCommentsSettings } from './settings';
+import { CommentDoc } from './comments/commentDoc';
+import { NoteStore } from './comments/noteStore';
+import { CommentsSidebarView, SIDEBAR_VIEW } from './comments/sidebarView';
+import { DEFAULT_SETTINGS, PAGE_THEME_LABELS, PAGE_THEMES, PdfCommentsSettingTab, sanitizeSettings, type PageTheme, type PdfCommentsSettings } from './settings';
 
 /** Obsidian's own PDF view type. */
 const BUILTIN_PDF = 'pdf';
@@ -24,6 +27,11 @@ export default class PdfCommentsPlugin extends Plugin {
 	/** Set while unloading, so handing tabs back to Obsidian's viewer is not redirected. */
 	private unloading = false;
 	private requestSave = debounce(() => void this.persist(), 1000, true);
+	notes!: NoteStore;
+	/** Comments per PDF path, shared by the views of that PDF. */
+	private docs = new Map<string, CommentDoc>();
+	/** The PDF view the comments sidebar follows. */
+	private sidebarSource: PdfCommentsView | null = null;
 
 	async onload(): Promise<void> {
 		const raw = ((await this.loadData()) ?? {}) as Partial<PluginData>;
@@ -34,6 +42,15 @@ export default class PdfCommentsPlugin extends Plugin {
 		// unregistering the view empties its tabs. Hand them to Obsidian's viewer first.
 		this.register(() => this.handBackTabs());
 		this.registerView(VIEW_TYPE, (leaf) => new PdfCommentsView(leaf, this));
+		this.registerView(SIDEBAR_VIEW, (leaf) => new CommentsSidebarView(leaf));
+		this.notes = new NoteStore({
+			app: this.app,
+			folder: () => this.settings.commentsFolder,
+			renameNotesWithPdfs: () => this.settings.renameNotesWithPdfs,
+			noteChanged: (pdf) => void this.docs.get(pdf)?.load(true),
+			digestOverwritten: (note) => new Notice(`"${note.basename}" is generated from the comments: your edits to its text were replaced. Comment in the PDF view instead.`, 8000),
+		});
+		this.registerCommentEvents();
 		this.addSettingTab(new PdfCommentsSettingTab(this.app, this));
 		this.patchOpening();
 		this.registerCommands();
@@ -55,6 +72,14 @@ export default class PdfCommentsPlugin extends Plugin {
 				if (file instanceof TFile && file.extension === 'pdf') {
 					this.viewStates = renameViewState(this.viewStates, oldPath, file.path);
 					this.requestSave();
+					const doc = this.docs.get(oldPath);
+					if (doc) {
+						this.docs.delete(oldPath);
+						doc.pdfPath = file.path;
+						this.docs.set(file.path, doc);
+					}
+					for (const v of this.ourViews()) if (v.file === file && v.comments) v.comments.pdfPath = file.path;
+					void this.notes.pdfRenamed(file, oldPath).catch((e) => console.error('[pdf-comments]', e));
 				}
 			}),
 		);
@@ -73,7 +98,17 @@ export default class PdfCommentsPlugin extends Plugin {
 			}),
 		);
 		this.registerEvent(this.app.workspace.on('layout-change', () => this.decorateBuiltinViews()));
+		this.registerEvent(
+			this.app.workspace.on('active-leaf-change', (leaf) => {
+				if (leaf?.view instanceof PdfCommentsView && leaf.view !== this.sidebarSource) {
+					this.sidebarSource = leaf.view;
+					this.refreshSidebars();
+				}
+			}),
+		);
 		this.app.workspace.onLayoutReady(() => {
+			this.notes.rebuild();
+			for (const doc of this.docs.values()) void doc.load(true);
 			this.decorateBuiltinViews();
 			// PDFs restored in Obsidian's viewer before the plugin loaded.
 			if (this.settings.openByDefault) for (const leaf of this.app.workspace.getLeavesOfType(BUILTIN_PDF)) void this.openWithComments(leaf, false);
@@ -120,10 +155,93 @@ export default class PdfCommentsPlugin extends Plugin {
 		window.setTimeout(tick, 0);
 	}
 
+	// ---- Comments ---------------------------------------------------------------
+
+	commentDoc(pdfPath: string): CommentDoc {
+		let doc = this.docs.get(pdfPath);
+		if (!doc) {
+			doc = new CommentDoc(this.app, this.notes, pdfPath);
+			this.docs.set(pdfPath, doc);
+		}
+		return doc;
+	}
+
+	/** Keeps the note index and the open PDFs' comments in step with the vault (DECISIONS D3.2). */
+	private registerCommentEvents(): void {
+		this.registerEvent(
+			this.app.metadataCache.on('changed', (file, data) => {
+				if (file.extension !== 'md') return;
+				const before = this.notes.pdfForNote(file.path);
+				const after = this.notes.index(file);
+				if (this.notes.isOwnWrite(file, data)) return;
+				for (const pdf of new Set([before, after])) if (pdf) void this.docs.get(pdf)?.load(true);
+			}),
+		);
+		this.registerEvent(
+			this.app.vault.on('delete', (file) => {
+				if (!(file instanceof TFile) || file.extension !== 'md') return;
+				const pdf = this.notes.forget(file.path);
+				if (pdf) void this.docs.get(pdf)?.load(true);
+			}),
+		);
+		this.registerEvent(
+			this.app.vault.on('rename', (file, oldPath) => {
+				if (!(file instanceof TFile) || file.extension !== 'md') return;
+				const pdf = this.notes.forget(oldPath);
+				this.notes.index(file);
+				if (pdf) void this.docs.get(pdf)?.load(true);
+			}),
+		);
+	}
+
+	/** A view's comments or comment UI changed. */
+	commentsChanged(view: PdfCommentsView): void {
+		if (!this.sidebarSource || this.sidebarSource === view || !this.sidebarSource.leaf.parent) {
+			this.sidebarSource = view;
+			this.refreshSidebars();
+		}
+	}
+
+	private refreshSidebars(): void {
+		const v = this.sidebarSource;
+		const src = v?.comments && v.file ? { title: v.file.basename, controller: v.comments } : null;
+		for (const leaf of this.app.workspace.getLeavesOfType(SIDEBAR_VIEW)) {
+			if (leaf.view instanceof CommentsSidebarView) leaf.view.setSource(src);
+		}
+	}
+
+	async openSidebar(focusSearch = false): Promise<void> {
+		let leaf = this.app.workspace.getLeavesOfType(SIDEBAR_VIEW)[0];
+		if (!leaf) {
+			leaf = this.app.workspace.getRightLeaf(false) ?? undefined;
+			if (!leaf) return;
+			await leaf.setViewState({ type: SIDEBAR_VIEW, active: true });
+		}
+		await this.app.workspace.revealLeaf(leaf);
+		this.refreshSidebars();
+		if (focusSearch && leaf.view instanceof CommentsSidebarView) leaf.view.focusSearch();
+	}
+
+	marginWidthChanged(): void {
+		for (const v of this.ourViews()) v.marginWidthChanged();
+	}
+
 	// ---- Data ----------------------------------------------------------------
 
 	async saveSettings(): Promise<void> {
 		await this.persist();
+	}
+
+	/** Page colours for every PDF view (DECISIONS D3.1). */
+	setPageTheme(theme: PageTheme): void {
+		this.settings.pageTheme = theme;
+		for (const v of this.ourViews()) v.applyPageTheme();
+		void this.saveSettings();
+	}
+
+	cyclePageTheme(): void {
+		const i = PAGE_THEMES.indexOf(this.settings.pageTheme);
+		this.setPageTheme(PAGE_THEMES[(i + 1) % PAGE_THEMES.length]!);
 	}
 
 	private async persist(): Promise<void> {
@@ -249,8 +367,33 @@ export default class PdfCommentsPlugin extends Plugin {
 		withView('zoom-reset', 'Reset zoom', (v) => v.resetZoom());
 		withView('zoom-fit-width', 'Zoom: fit width', (v) => v.setZoom('page-width'));
 		withView('zoom-fit-page', 'Zoom: fit page', (v) => v.setZoom('page-fit'));
-		withView('toggle-dark-pages', 'Toggle dark pages', (v) => v.toggleDarkPages());
+		this.addCommand({ id: 'cycle-page-colours', name: 'Page colours: next (normal, sepia, dark)', callback: () => this.cyclePageTheme() });
+		for (const t of PAGE_THEMES) this.addCommand({ id: `page-colours-${t}`, name: `Page colours: ${PAGE_THEME_LABELS[t].toLowerCase()}`, callback: () => this.setPageTheme(t) });
 		withView('toggle-outline', 'Toggle outline', (v) => v.toggleOutline());
+
+		const withSelection = (id: string, name: string, run: (v: PdfCommentsView) => void) =>
+			this.addCommand({
+				id,
+				name,
+				checkCallback: (checking) => {
+					const view = this.app.workspace.getActiveViewOfType(PdfCommentsView);
+					if (!view?.comments?.hasSelection()) return false;
+					if (!checking) run(view);
+					return true;
+				},
+			});
+		withSelection('add-comment', 'Add comment to the selected text', (v) => void v.comments?.addComment());
+		withSelection('copy-link-to-selection', 'Copy link to selection', (v) => void v.comments?.copyLinkToSelection());
+		withView('next-comment', 'Go to next comment', (v) => v.comments?.step(1));
+		withView('previous-comment', 'Go to previous comment', (v) => v.comments?.step(-1));
+		withView('toggle-resolved', 'Show or hide resolved comments', (v) => v.toggleResolved());
+		this.addCommand({ id: 'open-comments-sidebar', name: 'Open comments sidebar', callback: () => void this.openSidebar() });
+		this.addCommand({ id: 'search-comments', name: 'Search comments', callback: () => void this.openSidebar(true) });
+		withView('open-comment-note', 'Open the comment note of this PDF', (v) => {
+			const note = v.file ? this.notes.noteFileFor(v.file.path) : null;
+			if (note) void this.app.workspace.getLeaf('split').openFile(note);
+			else new Notice('This PDF has no comments yet.');
+		});
 	}
 }
 

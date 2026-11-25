@@ -4,22 +4,33 @@ import { App, PluginSettingTab, Setting } from 'obsidian';
 import { isZoomMode, percentLabel, ZOOM_PRESETS, type ZoomMode } from '../core/zoom';
 import type PdfCommentsPlugin from './main';
 
+export type PageTheme = 'normal' | 'sepia' | 'dark';
+export const PAGE_THEMES: PageTheme[] = ['normal', 'sepia', 'dark'];
+export const PAGE_THEME_LABELS: Record<PageTheme, string> = { normal: 'Normal', sepia: 'Sepia', dark: 'Dark' };
+export const PAGE_THEME_ICONS: Record<PageTheme, string> = { normal: 'sun', sepia: 'coffee', dark: 'moon' };
+
 export interface PdfCommentsSettings {
 	/** Open PDFs in our view instead of Obsidian's (SPEC §3.2). */
 	openByDefault: boolean;
-	/** Invert page colours in new views (SPEC §3.3). */
-	darkPages: boolean;
+	/** Page colours of every PDF view (SPEC §3.3, DECISIONS D3.1). */
+	pageTheme: PageTheme;
 	/** Zoom for PDFs opened for the first time. */
 	defaultZoom: ZoomMode;
-	/** Width of the comment margin, in px (used from Phase 3). */
+	/** Width of the comment margin, in px. */
 	marginWidth: number;
+	/** Folder of the comment notes (SPEC §5.1). */
+	commentsFolder: string;
+	/** Rename a PDF's comment note when the PDF is renamed. */
+	renameNotesWithPdfs: boolean;
 }
 
 export const DEFAULT_SETTINGS: PdfCommentsSettings = {
 	openByDefault: true,
-	darkPages: false,
+	pageTheme: 'normal',
 	defaultZoom: 'page-width',
 	marginWidth: 320,
+	commentsFolder: 'PDF comments',
+	renameNotesWithPdfs: true,
 };
 
 export function sanitizeSettings(raw: unknown): PdfCommentsSettings {
@@ -27,9 +38,12 @@ export function sanitizeSettings(raw: unknown): PdfCommentsSettings {
 	if (!raw || typeof raw !== 'object') return s;
 	const o = raw as Record<string, unknown>;
 	if (typeof o.openByDefault === 'boolean') s.openByDefault = o.openByDefault;
-	if (typeof o.darkPages === 'boolean') s.darkPages = o.darkPages;
+	if (PAGE_THEMES.includes(o.pageTheme as PageTheme)) s.pageTheme = o.pageTheme as PageTheme;
+	else if (o.darkPages === true) s.pageTheme = 'dark'; // setting of 0.1 builds
 	if (isZoomMode(o.defaultZoom)) s.defaultZoom = o.defaultZoom;
 	if (typeof o.marginWidth === 'number' && o.marginWidth >= 200 && o.marginWidth <= 600) s.marginWidth = o.marginWidth;
+	if (typeof o.commentsFolder === 'string') s.commentsFolder = o.commentsFolder;
+	if (typeof o.renameNotesWithPdfs === 'boolean') s.renameNotesWithPdfs = o.renameNotesWithPdfs;
 	return s;
 }
 
@@ -70,14 +84,54 @@ export class PdfCommentsSettingTab extends PluginSettingTab {
 				});
 			});
 
+		new Setting(containerEl).setName('Comments').setHeading();
+
 		new Setting(containerEl)
-			.setName('Dark pages')
-			.setDesc('Invert the colours of the pages in new views (pictures keep their hues). Each view also has a toggle.')
+			.setName('Folder for comment notes')
+			.setDesc('Each commented PDF gets one note here, linked to the PDF by its "pdf" property. Existing notes are not moved when you change this.')
+			.addText((t) =>
+				t
+					.setPlaceholder('PDF comments')
+					.setValue(s.commentsFolder)
+					.onChange(async (v) => {
+						s.commentsFolder = v.trim();
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName('Rename comment notes with their PDFs')
+			.setDesc('When a PDF is renamed, its comment note in the folder above gets the new name too.')
 			.addToggle((t) =>
-				t.setValue(s.darkPages).onChange(async (v) => {
-					s.darkPages = v;
+				t.setValue(s.renameNotesWithPdfs).onChange(async (v) => {
+					s.renameNotesWithPdfs = v;
 					await this.plugin.saveSettings();
 				}),
 			);
+
+		new Setting(containerEl)
+			.setName('Width of the comment margin')
+			.setDesc('In pixels (200–600).')
+			.addSlider((sl) =>
+				sl
+					.setLimits(200, 600, 10)
+					.setValue(s.marginWidth)
+					.onChange(async (v) => {
+						s.marginWidth = v;
+						await this.plugin.saveSettings();
+						this.plugin.marginWidthChanged();
+					}),
+			);
+
+		new Setting(containerEl).setName('Viewer').setHeading();
+
+		new Setting(containerEl)
+			.setName('Page colours')
+			.setDesc('Normal, sepia (warm paper) or dark (inverted, pictures keep their hues). Also in the toolbar of every PDF.')
+			.addDropdown((d) => {
+				for (const t of PAGE_THEMES) d.addOption(t, PAGE_THEME_LABELS[t]);
+				d.setValue(s.pageTheme);
+				d.onChange((v) => this.plugin.setPageTheme(v as PageTheme));
+			});
 	}
 }

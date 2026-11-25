@@ -176,14 +176,22 @@ export function anchorStart(a: Anchor): { page: number; top: number; left: numbe
 	return { page: s.page, top: r ? r[3] : Infinity, left: r ? r[0] : 0 };
 }
 
-/** Reading order: page, then top to bottom, then left to right, then text offset. */
+/**
+ * Reading order: by page; on a page, two text anchors by their place in the page text (which
+ * follows the PDF's content order, so on a two-column page the left column comes first);
+ * otherwise (areas) top to bottom, then left to right. (Cards in the margin are placed by
+ * height anyway: core/shared/layout.ts.)
+ */
 export function compareAnchors(a: Anchor, b: Anchor): number {
 	const x = anchorStart(a);
 	const y = anchorStart(b);
 	if (x.page !== y.page) return x.page - y.page;
+	const sa = a.segments[0]!.start;
+	const sb = b.segments[0]!.start;
+	if (!a.area && !b.area && sa !== undefined && sb !== undefined && sa !== sb) return sa - sb;
 	if (Math.abs(x.top - y.top) > 1) return y.top - x.top;
 	if (Math.abs(x.left - y.left) > 1) return x.left - y.left;
-	return (a.segments[0]!.start ?? 0) - (b.segments[0]!.start ?? 0);
+	return (sa ?? 0) - (sb ?? 0);
 }
 
 // ---- Quote and context ------------------------------------------------------

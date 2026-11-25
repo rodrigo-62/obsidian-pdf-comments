@@ -10,9 +10,11 @@
 //       .pdfc-main.pdf-container       (position: relative)
 //         .pdfc-scroll.pdf-viewer-container  (PDFViewer's container, absolute, scrolls)
 //           .pdfViewer                 (pages)
-//         .pdfc-findbar, .pdfc-message (overlays)
+//           .pdfc-margin               (comment cards, comments/margin.ts)
+//         .pdfc-findbar, .pdfc-message, .pdfc-narrow-btn (overlays)
 
-import { debounce, DropdownComponent, FileView, Scope, setIcon, setTooltip, TFile, WorkspaceLeaf } from 'obsidian';
+import { debounce, DropdownComponent, FileView, Menu, Scope, setIcon, setTooltip, TFile, WorkspaceLeaf } from 'obsidian';
+import { PAGE_THEME_ICONS, PAGE_THEME_LABELS, PAGE_THEMES } from './settings';
 import { parsePdfSubpath, type PdfSubpath, type TextSelectionRef } from '../core/subpath';
 import { percentLabel, scaleFor, stepScale, wheelScale, ZOOM_PRESETS, type ZoomMode } from '../core/zoom';
 import type { FileViewState } from '../core/viewStates';
@@ -21,6 +23,7 @@ import { OutlinePanel, type OutlineItem } from './outlinePanel';
 import { PasswordModal } from './passwordModal';
 import { loadPdfJsWithViewer, type EventBus, type PdfJs, type PDFDocumentProxy, type PDFFindController, type PDFLinkService, type PDFPageView, type PDFViewer } from './pdfjs';
 import type PdfCommentsPlugin from './main';
+import { CommentsController } from './comments/controller';
 
 export const VIEW_TYPE = 'pdf-comments';
 
@@ -54,7 +57,6 @@ export class PdfCommentsView extends FileView {
 	private zoom: ZoomMode;
 	private pendingSubpath: PdfSubpath | null = null;
 	private lastLocation: ViewLocation | null = null;
-	private darkPages: boolean;
 	private marginVisible = false;
 
 	private toolbarEl!: HTMLElement;
@@ -65,11 +67,17 @@ export class PdfCommentsView extends FileView {
 	private pageInput!: HTMLInputElement;
 	private pageCountEl!: HTMLElement;
 	private zoomDropdown!: DropdownComponent;
-	private darkBtn!: HTMLElement;
+	private themeBtn!: HTMLElement;
 	private outlineBtn!: HTMLElement;
 	private findBar: FindBar | null = null;
 	private outline!: OutlinePanel;
 	private built = false;
+	/** Comments of the PDF shown (created with the viewer). */
+	comments: CommentsController | null = null;
+	/** SHA-256 of the loaded file (DECISIONS D3.3). */
+	private fingerprint: string | null = null;
+	private resolvedBtn!: HTMLElement;
+	private lastScale = 0;
 
 	private saveLocation = debounce(() => this.persistLocation(), 400, true);
 
@@ -79,7 +87,6 @@ export class PdfCommentsView extends FileView {
 	) {
 		super(leaf);
 		this.zoom = plugin.settings.defaultZoom;
-		this.darkPages = plugin.settings.darkPages;
 		this.scope = new Scope(this.app.scope);
 		this.scope.register(['Mod'], 'f', () => {
 			this.openFind();
@@ -116,7 +123,8 @@ export class PdfCommentsView extends FileView {
 		const root = this.contentEl;
 		root.empty();
 		root.addClass('pdfc-view');
-		root.toggleClass('pdfc-dark-pages', this.darkPages);
+		root.style.setProperty('--pdfc-margin-width', `${this.plugin.settings.marginWidth}px`);
+		this.applyPageTheme();
 
 		this.toolbarEl = root.createDiv({ cls: 'pdfc-toolbar' });
 		const body = root.createDiv({ cls: 'pdfc-body' });
@@ -154,9 +162,13 @@ export class PdfCommentsView extends FileView {
 		});
 		this.toolButton(tb, 'zoom-in', 'Zoom in', () => this.zoomStep(1));
 		tb.createDiv({ cls: 'pdfc-toolbar-spacer' });
+		this.toolButton(tb, 'message-square-plus', 'Add comment (select text first)', () => void this.comments?.addComment());
+		this.resolvedBtn = this.toolButton(tb, 'check-check', 'Show resolved comments', () => this.toggleResolved());
+		this.toolButton(tb, 'panel-right', 'Comments sidebar', () => void this.plugin.openSidebar());
+		tb.createDiv({ cls: 'pdfc-toolbar-sep' });
 		this.toolButton(tb, 'search', 'Find', () => this.openFind());
-		this.darkBtn = this.toolButton(tb, 'moon', 'Dark pages', () => this.toggleDarkPages());
-		this.darkBtn.toggleClass('is-active', this.darkPages);
+		this.themeBtn = this.toolButton(tb, PAGE_THEME_ICONS[this.plugin.settings.pageTheme], 'Page colours', () => undefined);
+		this.themeBtn.addEventListener('click', (e) => this.pageThemeMenu(e));
 		this.updateZoomControl();
 		this.updatePageControls();
 
@@ -215,10 +227,39 @@ export class PdfCommentsView extends FileView {
 		this.findController = findController;
 		this.viewer = viewer;
 
+		const comments = new CommentsController({
+			app: this.app,
+			scrollEl: this.scrollEl,
+			pagesEl: this.pagesEl,
+			mainEl: this.mainEl,
+			marginWidth: () => this.plugin.settings.marginWidth,
+			pageView: (p) => this.pageView(p - 1),
+			pagesCount: () => (this.doc ? viewer.pagesCount : 0),
+			currentPage: () => viewer.currentPageNumber,
+			setMarginVisible: (v) => this.setMarginVisible(v),
+			commentDoc: (path) => this.plugin.commentDoc(path),
+			openSidebar: () => void this.plugin.openSidebar(),
+			changed: () => {
+				this.resolvedBtn?.toggleClass('is-active', comments.showResolved);
+				this.plugin.commentsChanged(this);
+			},
+		});
+		this.comments = comments;
+
 		eventBus.on('pagesinit', () => this.onPagesInit());
 		eventBus.on('pagechanging', () => this.updatePageControls());
-		eventBus.on('scalechanging', () => this.updateZoomControl());
+		eventBus.on('scalechanging', () => {
+			this.updateZoomControl();
+			comments.layoutChanged();
+		});
+		eventBus.on('pagesloaded', () => comments.layoutChanged());
+		eventBus.on('pagerendered', (e: { pageNumber: number }) => comments.pageRendered(e.pageNumber));
+		eventBus.on('textlayerrendered', (e: { pageNumber: number }) => comments.pageRendered(e.pageNumber));
 		eventBus.on('updateviewarea', (e: { location?: ViewLocation }) => {
+			if (viewer.currentScale !== this.lastScale) {
+				this.lastScale = viewer.currentScale;
+				comments.layoutChanged();
+			}
 			if (!this.ready || !e.location) return;
 			this.lastLocation = { pageNumber: e.location.pageNumber, top: e.location.top, left: e.location.left };
 			this.saveLocation();
@@ -252,7 +293,10 @@ export class PdfCommentsView extends FileView {
 		const viewer = this.ensureViewer(pdfjs);
 		try {
 			const data = new Uint8Array(await this.app.vault.readBinary(file));
+			// Before getDocument, which may hand the buffer over to the worker.
+			const fingerprint = await fingerprintOf(data);
 			if (token !== this.loadToken) return;
+			this.fingerprint = fingerprint;
 			const task = pdfjs.lib.getDocument({ data, ...DOCUMENT_OPTIONS });
 			task.onPassword = (update: (pw: string) => void, reason: number) => {
 				if (token !== this.loadToken) return;
@@ -295,6 +339,8 @@ export class PdfCommentsView extends FileView {
 
 	async onUnloadFile(file: TFile): Promise<void> {
 		this.persistLocation(file.path);
+		this.comments?.detach();
+		this.fingerprint = null;
 		this.loadToken++;
 		this.ready = false;
 		this.lastLocation = null;
@@ -335,6 +381,23 @@ export class PdfCommentsView extends FileView {
 		this.ready = true;
 		this.updatePageControls();
 		this.findBar?.refresh();
+		if (this.fingerprint) this.comments?.attach(this.file.path, this.doc, this.fingerprint);
+		if (sub?.comment) this.pendingComment = sub.comment;
+		this.revealPendingComment();
+	}
+
+	private pendingComment: string | null = null;
+
+	/** `#…&comment=ID`: activate the thread once comments are loaded. */
+	private revealPendingComment(): void {
+		const id = this.pendingComment;
+		const c = this.comments;
+		if (!id || !c?.doc) return;
+		void c.doc.load().then(() => {
+			if (this.pendingComment !== id || !c.threads[id]) return;
+			this.pendingComment = null;
+			c.activate(id, true);
+		});
 	}
 
 	private persistLocation(path = this.file?.path): void {
@@ -359,9 +422,14 @@ export class PdfCommentsView extends FileView {
 		const subpath = (state as { subpath?: unknown } | null)?.subpath;
 		if (typeof subpath !== 'string') return;
 		const sub = parsePdfSubpath(subpath);
-		if (!sub.page) return;
-		if (this.ready) this.goToSubpath(sub);
-		else this.pendingSubpath = sub;
+		if (!sub.page && !sub.comment) return;
+		if (this.ready) {
+			if (sub.page) this.goToSubpath(sub);
+			if (sub.comment) {
+				this.pendingComment = sub.comment;
+				this.revealPendingComment();
+			}
+		} else this.pendingSubpath = sub;
 	}
 
 	goToSubpath(sub: PdfSubpath): void {
@@ -483,6 +551,12 @@ export class PdfCommentsView extends FileView {
 		this.applyZoom();
 	}
 
+	marginWidthChanged(): void {
+		this.contentEl.style.setProperty('--pdfc-margin-width', `${this.plugin.settings.marginWidth}px`);
+		this.applyZoom();
+		this.comments?.render();
+	}
+
 	private marginWidth(): number {
 		return this.marginVisible ? this.plugin.settings.marginWidth : 0;
 	}
@@ -556,10 +630,25 @@ export class PdfCommentsView extends FileView {
 		this.findBar.open(text);
 	}
 
-	toggleDarkPages(): void {
-		this.darkPages = !this.darkPages;
-		this.contentEl.toggleClass('pdfc-dark-pages', this.darkPages);
-		this.darkBtn.toggleClass('is-active', this.darkPages);
+	/** Applies the plugin's page colours (called for every view when they change). */
+	applyPageTheme(): void {
+		const theme = this.plugin.settings.pageTheme;
+		for (const t of PAGE_THEMES) this.contentEl.toggleClass(`pdfc-theme-${t}`, t === theme);
+		if (this.themeBtn) setIcon(this.themeBtn, PAGE_THEME_ICONS[theme]);
+	}
+
+	private pageThemeMenu(e: MouseEvent): void {
+		const menu = new Menu();
+		for (const t of PAGE_THEMES) {
+			menu.addItem((i) =>
+				i
+					.setTitle(PAGE_THEME_LABELS[t])
+					.setIcon(PAGE_THEME_ICONS[t])
+					.setChecked(t === this.plugin.settings.pageTheme)
+					.onClick(() => this.plugin.setPageTheme(t)),
+			);
+		}
+		menu.showAtMouseEvent(e);
 	}
 
 	toggleOutline(): void {
@@ -585,8 +674,20 @@ export class PdfCommentsView extends FileView {
 		};
 	}
 
+	toggleResolved(): void {
+		this.comments?.toggleResolved();
+	}
+
 	onunload(): void {
+		this.comments?.destroy();
+		this.comments = null;
 		this.saveLocation.run();
 		super.onunload();
 	}
+}
+
+/** Short SHA-256 of the file's bytes (DECISIONS D3.3). */
+async function fingerprintOf(data: Uint8Array<ArrayBuffer>): Promise<string> {
+	const digest = await crypto.subtle.digest('SHA-256', data);
+	return Array.from(new Uint8Array(digest).slice(0, 8), (b) => b.toString(16).padStart(2, '0')).join('');
 }

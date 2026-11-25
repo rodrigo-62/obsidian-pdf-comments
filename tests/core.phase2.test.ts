@@ -163,15 +163,22 @@ describe('anchor', () => {
 		expect(half[0]![2] - half[0]![0]).toBeCloseTo(item.width / 2, -1);
 	});
 
-	it('orders anchors by page, top to bottom, left to right', () => {
-		const a = (page: number, top: number, left: number, start = 0): Anchor => ({ segments: [{ page, start, end: start + 1, rects: [[left, top - 10, left + 5, top]] }] });
-		const sorted = [a(2, 500, 10), a(1, 300, 10), a(1, 700, 300), a(1, 700, 40), a(1, 700.5, 40, 9)].sort(compareAnchors);
-		expect(sorted.map((x) => [anchorStart(x).page, anchorStart(x).top, anchorStart(x).left, x.segments[0]!.start])).toEqual([
-			[1, 700, 40, 0],
-			[1, 700.5, 40, 9],
-			[1, 700, 300, 0],
-			[1, 300, 10, 0],
-			[2, 500, 10, 0],
+	it('orders text anchors by page and text order, areas top to bottom then left to right', () => {
+		const text = (page: number, top: number, left: number, start: number): Anchor => ({ segments: [{ page, start, end: start + 1, rects: [[left, top - 10, left + 5, top]] }] });
+		const area = (page: number, top: number, left: number): Anchor => ({ segments: [{ page, rects: [[left, top - 10, left + 5, top]] }], area: true });
+		// Two-column page: the right column's top (start 900) comes after the left column's bottom (start 400).
+		const sorted = [text(2, 500, 10, 0), text(1, 700, 300, 900), text(1, 200, 40, 400), text(1, 700, 40, 50)].sort(compareAnchors);
+		expect(sorted.map((x) => [anchorStart(x).page, x.segments[0]!.start])).toEqual([
+			[1, 50],
+			[1, 400],
+			[1, 900],
+			[2, 0],
+		]);
+		const areas = [area(1, 300, 10), area(1, 700, 300), area(1, 700, 40)].sort(compareAnchors);
+		expect(areas.map((x) => [anchorStart(x).top, anchorStart(x).left])).toEqual([
+			[700, 40],
+			[700, 300],
+			[300, 10],
 		]);
 	});
 

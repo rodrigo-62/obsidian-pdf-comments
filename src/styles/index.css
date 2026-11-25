@@ -1,2 +1,3 @@
 /* PDF Comments styles. Entry point; partials are imported here. */
 @import './viewer.css';
+@import './comments.css';

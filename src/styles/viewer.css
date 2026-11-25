@@ -77,9 +77,28 @@
 	margin-right: var(--pdfc-margin-width);
 }
 
-/* ---- Dark pages: invert what PDF.js painted, keep hues ---- */
-.pdfc-dark-pages .pdfViewer .page .canvasWrapper canvas {
-	filter: invert(1) hue-rotate(180deg);
+/* ---- Page colours (DECISIONS D3.1). Only what PDF.js painted is recoloured: the text
+   layer, our highlights and the cards are not. Themes and snippets can change the tones. ---- */
+.pdfc-view {
+	--pdfc-sepia-paper: #f3e7cf;
+	--pdfc-dark-invert: 0.88;
+}
+/* Sepia: a warm paper tone multiplied over the page. White becomes the paper colour,
+   black stays black, pictures are tinted the same way. */
+.pdfc-theme-sepia .pdfViewer .page .canvasWrapper {
+	position: relative;
+}
+.pdfc-theme-sepia .pdfViewer .page .canvasWrapper::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	background-color: var(--pdfc-sepia-paper);
+	mix-blend-mode: multiply;
+	pointer-events: none;
+}
+/* Dark: inverted to soft greys (not pure black and white); hue-rotate keeps colours recognisable. */
+.pdfc-theme-dark .pdfViewer .page .canvasWrapper canvas {
+	filter: invert(var(--pdfc-dark-invert)) hue-rotate(180deg);
 }
 
 /* ---- Outline ---- */

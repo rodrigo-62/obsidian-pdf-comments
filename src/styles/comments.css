@@ -1,0 +1,585 @@
+/* Comments (SPEC §4). Cards, composer and sidebar are adapted from the Docs plugin's
+   comments.css and margin.css (prefix folio- → pdfc-); the highlight layer and the margin
+   inside the PDF's scroll area are this plugin's own. */
+
+/* ---- Highlight colours (from the Docs plugin) ---- */
+body {
+	--pdfc-hl-bg: rgba(255, 210, 0, 0.26);
+	--pdfc-hl-bg-strong: rgba(255, 186, 0, 0.55);
+	--pdfc-hl-line: rgba(220, 160, 0, 0.95);
+	--pdfc-hl-draft: rgba(80, 140, 255, 0.25);
+	--pdfc-hl-resolved: rgba(128, 128, 128, 0.18);
+	--pdfc-active-outline: color-mix(in srgb, var(--pdfc-hl-line) 60%, transparent);
+}
+body.theme-dark {
+	--pdfc-hl-bg: rgba(255, 205, 60, 0.24);
+	--pdfc-hl-bg-strong: rgba(255, 200, 60, 0.5);
+	--pdfc-hl-line: rgba(255, 205, 60, 0.9);
+	--pdfc-hl-draft: rgba(100, 160, 255, 0.28);
+	--pdfc-hl-resolved: rgba(160, 160, 160, 0.16);
+	/* softer, more pastel outline for the active card on dark backgrounds */
+	--pdfc-active-outline: color-mix(in srgb, rgb(240, 215, 150) 38%, transparent);
+}
+
+
+/* ---- Highlights on the pages (comments/highlights.ts) ---- */
+.pdfc-hl-layer {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	/* above the canvas, below the text layer (DOM order), so text stays selectable */
+}
+.pdfc-hl {
+	position: absolute;
+	background-color: var(--pdfc-hl-bg);
+	mix-blend-mode: multiply;
+	border-radius: 2px;
+	transition: background-color 80ms ease;
+}
+.pdfc-hl.is-hover,
+.pdfc-hl.is-active {
+	background-color: var(--pdfc-hl-bg-strong);
+	box-shadow: 0 2px 0 var(--pdfc-hl-line);
+}
+.pdfc-hl.is-resolved {
+	background-color: var(--pdfc-hl-resolved);
+	box-shadow: none;
+}
+.pdfc-hl.is-resolved.is-active {
+	background-color: var(--pdfc-hl-bg);
+}
+.pdfc-hl.is-draft {
+	background-color: var(--pdfc-hl-draft);
+}
+.pdfc-hl.pdfc-hl-area {
+	background-color: transparent;
+	border: 2px solid var(--pdfc-hl-line);
+	mix-blend-mode: normal;
+}
+.pdfc-hl.pdfc-hl-area.is-active {
+	background-color: color-mix(in srgb, var(--pdfc-hl-bg) 50%, transparent);
+}
+/* On dark pages "multiply" would hide the colour: plain translucent colour instead. */
+.pdfc-theme-dark .pdfc-hl {
+	mix-blend-mode: normal;
+	background-color: rgba(255, 205, 60, 0.28);
+}
+.pdfc-theme-dark .pdfc-hl.is-hover,
+.pdfc-theme-dark .pdfc-hl.is-active {
+	background-color: rgba(255, 205, 60, 0.45);
+}
+.pdfc-theme-dark .pdfc-hl.is-draft {
+	background-color: rgba(100, 160, 255, 0.35);
+}
+.pdfc-theme-dark .pdfc-hl.is-resolved {
+	background-color: rgba(160, 160, 160, 0.22);
+}
+.pdfViewer.pdfc-over-comment .textLayer {
+	cursor: pointer;
+}
+
+/* ---- The margin (comments/margin.ts) ---- */
+.pdfc-margin {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 300px;
+	height: 0;
+	z-index: 3;
+	pointer-events: none;
+}
+.pdfc-margin > .pdfc-card,
+.pdfc-margin > .pdfc-detached-header {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	pointer-events: auto;
+	/* cards glide to their places; `top` rather than a transform keeps text crisp */
+	transition: top 140ms cubic-bezier(0.22, 0.8, 0.25, 1), left 100ms ease, right 100ms ease, box-shadow 100ms ease;
+}
+.pdfc-detached-header {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	pointer-events: auto;
+	/* cards glide to their places and never overlap (the layout keeps gaps). Positioned with
+	   `top` rather than a transform, so the text stays as crisp as the page's. */
+	transition: top 140ms cubic-bezier(0.22, 0.8, 0.25, 1), left 100ms ease, right 100ms ease, box-shadow 100ms ease;
+}
+
+.pdfc-detached-header {
+	font-family: var(--font-interface);
+	font-size: var(--font-ui-smaller);
+	font-weight: var(--font-semibold);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--text-muted);
+	padding: 6px 2px 2px;
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+
+.pdfc-narrow-btn {
+	position: absolute;
+	top: var(--size-4-2);
+	right: var(--size-4-6);
+	z-index: 15;
+	font-family: var(--font-interface);
+	font-size: var(--font-ui-smaller);
+	padding: 2px 8px;
+	border-radius: 10px;
+	background: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+	color: var(--text-muted);
+	cursor: pointer;
+}
+.pdfc-narrow-btn:hover {
+	color: var(--text-normal);
+	background: var(--background-modifier-hover);
+}
+/* the find bar sits where the narrow button would be */
+.pdfc-findbar:not([style*="display: none"]) ~ .pdfc-narrow-btn {
+	top: calc(var(--size-4-2) + 44px);
+}
+
+/* ---- Composer ----------------------------------------------------------- */
+.pdfc-composer {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+.pdfc-composer-input {
+	width: 100%;
+	min-height: 2.6em;
+	resize: none;
+	font-family: var(--font-interface);
+	font-size: var(--font-ui-small);
+	line-height: 1.4;
+	padding: 6px 8px;
+	border-radius: var(--radius-s);
+}
+.pdfc-composer-actions {
+	display: flex;
+	gap: 6px;
+	align-items: center;
+	justify-content: flex-end;
+}
+.pdfc-composer-hint {
+	margin-right: auto;
+	font-size: var(--font-ui-smaller);
+	color: var(--text-faint);
+}
+.pdfc-priority-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	color: var(--text-muted);
+}
+.pdfc-priority-chip .pdfc-priority-icon {
+	display: inline-flex;
+}
+.pdfc-priority-chip .pdfc-priority-icon svg {
+	width: 1em;
+	height: 1em;
+}
+.pdfc-priority-chip[data-priority='high'] {
+	color: var(--color-orange);
+}
+.pdfc-priority-chip[data-priority='critical'] {
+	color: var(--color-red);
+}
+.pdfc-btn.is-disabled {
+	opacity: 0.5;
+	pointer-events: none;
+}
+.pdfc-composer-modal .pdfc-quote {
+	border-left: 3px solid var(--pdfc-hl-line);
+	padding: 4px 10px;
+	margin-bottom: 10px;
+	color: var(--text-muted);
+	font-style: italic;
+	white-space: pre-wrap;
+	max-height: 8em;
+	overflow: auto;
+}
+.pdfc-composer-modal .pdfc-composer-input {
+	min-height: 6em;
+	font-size: var(--font-ui-medium);
+}
+
+/* ---- Cards ------------------------------------------------------------- */
+.pdfc-card {
+	box-sizing: border-box;
+	background: color-mix(in srgb, var(--background-primary) 93%, var(--text-normal) 7%);
+	border: 1px solid transparent;
+	border-radius: 8px;
+	padding: 6px 10px 8px;
+	font-family: var(--font-interface);
+	font-size: var(--pdfc-comment-size, var(--font-ui-small));
+	line-height: 1.45;
+	color: var(--text-normal);
+	cursor: pointer;
+	text-align: left;
+}
+.pdfc-card:hover {
+	border-color: var(--background-modifier-border);
+}
+.pdfc-card.is-active {
+	cursor: default;
+	z-index: 2;
+	background: var(--background-primary);
+	/* a soft outline in the highlight colour: visible in dark themes too, where shadows aren't */
+	border-color: var(--pdfc-active-outline);
+	box-shadow: 0 4px 18px rgba(0, 0, 0, 0.22), 0 1px 4px rgba(0, 0, 0, 0.14);
+}
+/* the active margin card steps out towards the text, like in Google Docs */
+.pdfc-margin > .pdfc-card.is-active {
+	left: -8px;
+	right: 8px;
+}
+.pdfc-card.is-resolved {
+	opacity: 0.7;
+	background: var(--background-secondary);
+}
+.pdfc-card.is-detached {
+	border-style: dashed;
+}
+.pdfc-card-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 4px;
+	min-height: 24px;
+}
+.pdfc-card-meta {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	color: var(--text-faint);
+	font-size: 0.85em;
+	min-width: 0;
+}
+.pdfc-badge {
+	font-size: 0.85em;
+	padding: 0 5px;
+	border-radius: 4px;
+	background: var(--background-modifier-hover);
+	color: var(--text-muted);
+}
+.pdfc-badge-detached {
+	background: rgba(var(--color-orange-rgb), 0.15);
+	color: var(--color-orange);
+}
+/* Priority (DECISIONS F9.3): a badge, and a coloured left edge for high and critical. */
+.pdfc-priority-badge.is-low {
+	color: var(--text-faint);
+}
+.pdfc-priority-badge.is-high {
+	background: rgba(var(--color-orange-rgb), 0.15);
+	color: var(--color-orange);
+}
+.pdfc-priority-badge.is-critical {
+	background: rgba(var(--color-red-rgb), 0.15);
+	color: var(--color-red);
+	font-weight: var(--font-semibold);
+}
+.pdfc-card.pdfc-priority-high,
+.pdfc-card.pdfc-priority-critical {
+	border-left-width: 3px;
+	padding-left: 8px;
+}
+.pdfc-card.pdfc-priority-high,
+.pdfc-card.pdfc-priority-high:hover,
+.pdfc-card.pdfc-priority-high.is-active {
+	border-left-color: var(--color-orange);
+}
+.pdfc-card.pdfc-priority-critical,
+.pdfc-card.pdfc-priority-critical:hover,
+.pdfc-card.pdfc-priority-critical.is-active {
+	border-left-color: var(--color-red);
+}
+.pdfc-card-actions {
+	display: flex;
+	gap: 0;
+	opacity: 0;
+	transition: opacity 100ms ease;
+}
+.pdfc-card:hover .pdfc-card-actions,
+.pdfc-card.is-active .pdfc-card-actions,
+.pdfc-card-sidebar .pdfc-card-actions {
+	opacity: 1;
+}
+.pdfc-icon-btn.clickable-icon {
+	padding: 3px;
+	height: 22px;
+	width: 22px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	background: transparent;
+	box-shadow: none;
+	border: none;
+}
+.pdfc-icon-btn svg {
+	width: 14px;
+	height: 14px;
+}
+.pdfc-resolve-btn:hover {
+	color: var(--color-green);
+}
+.pdfc-card-quote {
+	font-style: italic;
+	color: var(--text-muted);
+	border-left: 3px solid var(--pdfc-hl-line);
+	padding: 0 0 0 8px;
+	margin: 2px 0 6px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/* ---- Comments inside a card -------------------------------------------- */
+.pdfc-comment {
+	position: relative;
+	padding: 2px 0;
+}
+.pdfc-comment + .pdfc-comment,
+.pdfc-more + .pdfc-comment {
+	border-top: 1px solid var(--background-modifier-border);
+	margin-top: 4px;
+	padding-top: 6px;
+}
+.pdfc-comment-meta {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	color: var(--text-faint);
+	font-size: 0.85em;
+	min-height: 18px;
+}
+.pdfc-comment-meta:empty {
+	display: none;
+}
+.pdfc-comment-actions {
+	margin-left: auto;
+	display: flex;
+	visibility: hidden;
+}
+.pdfc-comment:hover > .pdfc-comment-meta > .pdfc-comment-actions {
+	visibility: visible;
+}
+.pdfc-comment-body {
+	user-select: text;
+	-webkit-user-select: text;
+	overflow-wrap: anywhere;
+}
+.pdfc-comment-body > :first-child {
+	margin-top: 0;
+}
+.pdfc-comment-body > :last-child {
+	margin-bottom: 0;
+}
+.pdfc-comment-body p {
+	margin: 0.3em 0;
+}
+.pdfc-comment-body hr {
+	margin: 0.5em 0;
+	border: none;
+	border-top: 1px dashed var(--text-faint);
+}
+.pdfc-comment-body ul,
+.pdfc-comment-body ol {
+	padding-left: 1.3em;
+	margin: 0.3em 0;
+}
+.pdfc-comment.is-compact .pdfc-comment-body {
+	display: -webkit-box;
+	-webkit-line-clamp: 4;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+.pdfc-more {
+	color: var(--text-accent);
+	font-size: 0.85em;
+	margin: 4px 0 0;
+	cursor: pointer;
+}
+.pdfc-chip {
+	display: block;
+	max-width: 100%;
+	box-sizing: border-box;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 0.85em;
+	color: var(--text-muted);
+	background: var(--background-secondary);
+	border-radius: 4px;
+	padding: 0 6px;
+	margin: 1px 0 3px;
+	cursor: pointer;
+}
+.pdfc-chip:hover {
+	color: var(--text-normal);
+	background: var(--background-modifier-hover);
+}
+@keyframes pdfc-row-flash {
+	0% { background-color: var(--pdfc-hl-bg-strong); }
+	100% { background-color: transparent; }
+}
+.pdfc-comment.pdfc-flash {
+	animation: pdfc-row-flash 1.4s ease;
+	border-radius: 4px;
+}
+.pdfc-edited {
+	font-style: italic;
+}
+
+/* tree view */
+.pdfc-tree-row {
+	margin-left: calc(var(--pdfc-indent, 0) * 12px);
+}
+.pdfc-tree-row.is-indented {
+	padding-left: 8px;
+	border-left: 2px solid var(--background-modifier-border);
+}
+.pdfc-tree-row + .pdfc-tree-row.is-indented {
+	border-top: none;
+	margin-top: 2px;
+}
+.pdfc-tree-toggle {
+	margin-left: auto;
+	padding: 0 4px;
+	font-size: 0.85em;
+	color: var(--text-muted);
+	cursor: pointer;
+	border-radius: 4px;
+}
+.pdfc-tree-toggle:hover {
+	color: var(--text-normal);
+	background: var(--background-modifier-hover);
+}
+.pdfc-tree-toggle + .pdfc-comment-actions {
+	margin-left: 0;
+}
+
+/* reply box */
+.pdfc-card-footer {
+	margin-top: 6px;
+}
+.pdfc-reply-target {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	font-size: 0.85em;
+	color: var(--text-muted);
+	margin-bottom: 2px;
+}
+.pdfc-reply-composer:not(:focus-within):not(.has-text) .pdfc-composer-actions {
+	display: none;
+}
+.pdfc-reply-composer .pdfc-composer-input {
+	min-height: 0;
+	padding: 5px 10px;
+	line-height: 1.4;
+}
+.pdfc-reply-composer:not(:focus-within):not(.has-text) .pdfc-composer-input {
+	border-radius: 1.2em;
+}
+.pdfc-reply-composer:not(:focus-within):not(.has-text) .pdfc-composer-input {
+	overflow-y: hidden;
+}
+.pdfc-card .pdfc-composer-hint {
+	display: none;
+}
+.pdfc-card .pdfc-priority-chip {
+	margin-right: auto;
+}
+.pdfc-card .pdfc-composer-input {
+	font-size: 1em;
+}
+.pdfc-card .pdfc-composer-actions button {
+	font-size: 0.85em;
+	padding: 2px 10px;
+	height: auto;
+}
+.pdfc-draft {
+	cursor: default;
+}
+
+/* ---- Sidebar ------------------------------------------------------------ */
+.pdfc-sidebar {
+	padding: 0 !important;
+}
+.pdfc-sidebar-top {
+	position: sticky;
+	top: 0;
+	/* above cards (an active card is raised to z-index 5) */
+	z-index: 10;
+	background: var(--background-secondary);
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+.pdfc-sidebar-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 8px 10px 4px;
+}
+.pdfc-sidebar-search {
+	padding: 0 10px 8px;
+}
+.pdfc-sidebar-search .search-input-container {
+	width: 100%;
+	margin: 0;
+}
+.pdfc-sidebar-search-status {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0 8px;
+	margin-top: 4px;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
+.pdfc-sidebar-search-more {
+	color: var(--text-accent);
+}
+/* Comment search matches (CSS Custom Highlight API, set by the sidebar). */
+::highlight(pdfc-comment-search) {
+	/* --text-highlight-bg in older Obsidian, --highlight-background in 1.9+ */
+	background-color: var(--text-highlight-bg, var(--highlight-background, rgba(255, 208, 0, 0.4)));
+	color: var(--text-normal);
+}
+/* the match Enter / Shift+Enter went to */
+::highlight(pdfc-comment-search-current) {
+	background-color: rgba(var(--color-orange-rgb), 0.45);
+	color: var(--text-normal);
+}
+.pdfc-sidebar-title {
+	font-weight: var(--font-semibold);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.pdfc-sidebar-actions {
+	display: flex;
+	gap: 2px;
+}
+.pdfc-sidebar-empty {
+	padding: 16px 12px;
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+}
+.pdfc-sidebar-list {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 10px;
+}
+/* room to scroll the last matches up to where the eye is, not the bottom edge */
+.pdfc-sidebar.is-searching .pdfc-sidebar-list {
+	padding-bottom: 50vh;
+}
+.pdfc-sidebar-list .pdfc-detached-header {
+	margin-top: 6px;
+}
