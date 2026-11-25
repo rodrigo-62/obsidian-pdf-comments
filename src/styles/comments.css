@@ -585,3 +585,28 @@ body.theme-dark {
 .pdfc-sidebar-list .pdfc-detached-header {
 	margin-top: 6px;
 }
+
+/* ---- Copy for LLM dialog ---- */
+input.pdfc-range-input {
+	width: 5em;
+}
+
+/* ---- Area comments ---- */
+.pdfViewer.pdfc-area-mode .page {
+	cursor: crosshair;
+}
+.pdfViewer.pdfc-area-mode .textLayer,
+.pdfViewer.pdfc-area-mode .annotationLayer {
+	pointer-events: none;
+}
+.pdfc-area-drag {
+	position: absolute;
+	z-index: 10;
+	border: 2px dashed var(--interactive-accent);
+	background-color: color-mix(in srgb, var(--interactive-accent) 12%, transparent);
+	pointer-events: none;
+}
+.pdfc-hl.pdfc-hl-area.is-draft {
+	border-color: var(--interactive-accent);
+	background-color: color-mix(in srgb, var(--interactive-accent) 12%, transparent);
+}

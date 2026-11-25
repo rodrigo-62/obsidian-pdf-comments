@@ -2,11 +2,14 @@
 // The data lives in a CommentDoc shared by all views of the same PDF.
 
 import { Menu, Notice, type App } from 'obsidian';
-import { anchorStart, compareAnchors, pdfRectToCss, type Anchor, type Transform } from '../../core/anchor';
+import { anchorStart, compareAnchors, cssRectToPdf, pdfRectToCss, roundRect, type Anchor, type Transform } from '../../core/anchor';
+import { offsetToItem } from '../../core/pageText';
 import { generateId } from '../../core/ids';
 import { addReply, createThread, deleteComment, editComment, setPriority, setResolved, type Priority } from '../../core/shared/model';
 import { threadAnchor, type PdfThread, type PdfThreads } from '../../core/sidecar';
 import { formatPdfSubpath } from '../../core/subpath';
+import { areaTextOffset, exportPdfForLLM, exportSummary, pagesNeeded, type PdfExportOptions } from '../../core/llmExport';
+import { CopyForLlmModal, type LlmChoice } from './llmModal';
 import type { CardHost } from './card';
 import type { CommentDoc } from './commentDoc';
 import { ComposerModal } from './composer';
@@ -28,6 +31,9 @@ export interface ControllerHost {
 	currentPage(): number;
 	setMarginVisible(visible: boolean): void;
 	commentDoc(pdfPath: string): CommentDoc;
+	/** Last choices in the Copy for LLM dialog (remembered in the settings). */
+	llmChoice(): LlmChoice;
+	setLlmChoice(choice: LlmChoice): void;
 	openSidebar(): void;
 	/** Comments or UI state changed (the sidebar listens). */
 	changed(): void;
@@ -53,6 +59,9 @@ export class CommentsController {
 	private tree = new Set<string>();
 	private hoverFrame = 0;
 	private selHost: SelectionHost;
+	/** "Comment on an area" mode (SPEC §4): the next drag on a page draws a rectangle. */
+	areaMode = false;
+	private drag: { page: HTMLElement; x0: number; y0: number; box: HTMLElement } | null = null;
 
 	constructor(private host: ControllerHost) {
 		this.highlights = new Highlights((p) => host.pageView(p));
@@ -83,6 +92,10 @@ export class CommentsController {
 		host.pagesEl.addEventListener('mousemove', (e) => this.onPagesMove(e));
 		host.pagesEl.addEventListener('mouseleave', () => this.setHover(null));
 		host.pagesEl.addEventListener('contextmenu', (e) => this.onContextMenu(e));
+		// Area comments: in area mode, or with Alt held, a drag on a page draws a rectangle.
+		host.pagesEl.addEventListener('mousedown', (e) => this.onAreaDown(e), true);
+		host.pagesEl.win.addEventListener('mousemove', this.onAreaMove);
+		host.pagesEl.win.addEventListener('mouseup', this.onAreaUp);
 		host.scrollEl.addEventListener('mousedown', (e) => {
 			// Outside the pages and the margin: deactivate.
 			const t = e.target as HTMLElement;
@@ -91,9 +104,64 @@ export class CommentsController {
 	}
 
 	destroy(): void {
+		this.host.pagesEl.win.removeEventListener('mousemove', this.onAreaMove);
+		this.host.pagesEl.win.removeEventListener('mouseup', this.onAreaUp);
 		this.detach();
 		this.margin.destroy();
 	}
+
+	// ---- Area comments ----------------------------------------------------------------
+
+	setAreaMode(on: boolean): void {
+		this.areaMode = on;
+		this.host.pagesEl.toggleClass('pdfc-area-mode', on);
+		this.host.changed();
+	}
+
+	private onAreaDown(e: MouseEvent): void {
+		if (e.button !== 0 || !(this.areaMode || e.altKey) || !this.texts) return;
+		const page = (e.target as HTMLElement).closest<HTMLElement>('.page[data-page-number]');
+		if (!page) return;
+		e.preventDefault();
+		e.stopPropagation();
+		this.host.pagesEl.win.getSelection()?.removeAllRanges();
+		const box = page.createDiv({ cls: 'pdfc-area-drag' });
+		this.drag = { page, x0: e.clientX, y0: e.clientY, box };
+		this.onAreaMove(e);
+	}
+
+	private onAreaMove = (e: MouseEvent): void => {
+		const d = this.drag;
+		if (!d) return;
+		const r = d.page.getBoundingClientRect();
+		const ox = r.left + d.page.clientLeft;
+		const oy = r.top + d.page.clientTop;
+		const clamp = (v: number, max: number) => Math.min(Math.max(v, 0), max);
+		const x1 = clamp(Math.min(d.x0, e.clientX) - ox, d.page.clientWidth);
+		const y1 = clamp(Math.min(d.y0, e.clientY) - oy, d.page.clientHeight);
+		const x2 = clamp(Math.max(d.x0, e.clientX) - ox, d.page.clientWidth);
+		const y2 = clamp(Math.max(d.y0, e.clientY) - oy, d.page.clientHeight);
+		d.box.setCssProps({ left: `${x1}px`, top: `${y1}px`, width: `${x2 - x1}px`, height: `${y2 - y1}px` });
+	};
+
+	private onAreaUp = (e: MouseEvent): void => {
+		const d = this.drag;
+		if (!d) return;
+		this.drag = null;
+		const left = parseFloat(d.box.style.left);
+		const top = parseFloat(d.box.style.top);
+		const w = parseFloat(d.box.style.width);
+		const h = parseFloat(d.box.style.height);
+		d.box.remove();
+		void e;
+		if (!(w >= 8 && h >= 8)) return; // a click, not a drag
+		const page = Number(d.page.dataset.pageNumber);
+		const pv = this.host.pageView(page);
+		if (!pv) return;
+		const rect = roundRect(cssRectToPdf(left, top, left + w, top + h, pv.viewport.transform as Transform));
+		this.setAreaMode(false);
+		this.startDraft({ anchor: { segments: [{ page, rects: [rect] }], area: true }, quote: '' });
+	};
 
 	// ---- Document --------------------------------------------------------------------
 
@@ -161,7 +229,7 @@ export class CommentsController {
 			const a = threadAnchor(t)!;
 			for (const s of a.segments) items.push({ id, page: s.page, rects: s.rects, area: a.area === true, resolved: t.resolved });
 		}
-		if (this.draft) for (const s of this.draft.anchor.segments) items.push({ id: DRAFT_ID, page: s.page, rects: s.rects, area: false, resolved: false });
+		if (this.draft) for (const s of this.draft.anchor.segments) items.push({ id: DRAFT_ID, page: s.page, rects: s.rects, area: this.draft.anchor.area === true, resolved: false });
 		const before = new Set(this.highlights.pagesWithItems());
 		this.highlights.setItems(items);
 		this.highlights.setState({ activeId: this.activeId, hoverId: this.hoverId, draftId: this.draft ? DRAFT_ID : null });
@@ -258,14 +326,23 @@ export class CommentsController {
 			return;
 		}
 		this.host.pagesEl.win.getSelection()?.removeAllRanges();
-		this.draft = sel;
+		this.startDraft(sel);
+	}
+
+	private startDraft(draft: Draft): void {
+		if (this.doc?.error) {
+			new Notice(`The comments of this PDF can't be changed: ${this.doc.error}`);
+			return;
+		}
+		this.draft = draft;
 		this.activeId = null;
 		this.render();
 		if (this.margin.isWide) {
 			this.margin.focusDraft();
 			return;
 		}
-		new ComposerModal(this.host.app, 'New comment', sel.quote, {
+		const quote = draft.anchor.area ? `[Area on page ${draft.anchor.segments[0]!.page}]` : draft.quote;
+		new ComposerModal(this.host.app, 'New comment', quote, {
 			submitLabel: 'Comment',
 			priority: 'normal',
 			onSubmit: (text, { priority }) => void this.createFromDraft(text, priority),
@@ -306,6 +383,79 @@ export class CommentsController {
 		const link = this.host.app.fileManager.generateMarkdownLink(file, '', formatPdfSubpath({ page: r.page, selection: r.ref }), `${file.basename}, p.${r.page}`);
 		await navigator.clipboard.writeText(link);
 		new Notice('Link to the selection copied');
+	}
+
+	// ---- Copy for LLM (SPEC §6) -------------------------------------------------------
+
+	openCopyForLlm(): void {
+		if (!this.texts || !this.pdfPath) return;
+		const total = this.texts.numPages;
+		new CopyForLlmModal(this.host.app, total, this.host.llmChoice(), (choice) => {
+			this.host.setLlmChoice(choice);
+			void this.copyForLlm(choice);
+		}).open();
+	}
+
+	async copyForLlm(choice: LlmChoice): Promise<void> {
+		const texts = this.texts;
+		const path = this.pdfPath;
+		if (!texts || !path) return;
+		const threads = this.threads;
+		const options: PdfExportOptions = {
+			title: path.split('/').pop()!.replace(/\.pdf$/i, ''),
+			source: path,
+			totalPages: texts.numPages,
+			scope: choice.scope,
+			range: choice.range,
+			mode: choice.mode,
+			includeResolved: choice.includeResolved,
+		};
+		const notice = new Notice('Collecting the text…', 0);
+		try {
+			const pages = new Map<number, string>();
+			for (const p of pagesNeeded(threads, options)) pages.set(p, (await texts.get(p)).text.text);
+			// Area comments: their marker goes before the first line below the area's top.
+			const areaOffsets: Record<string, number> = {};
+			for (const [id, t] of Object.entries(threads)) {
+				const a = threadAnchor(t);
+				const s = a?.area ? a.segments[0] : null;
+				if (!s || !pages.has(s.page)) continue;
+				const data = await texts.get(s.page);
+				areaOffsets[id] = areaTextOffset(data.items, data.text.starts, Math.max(...s.rects.map((r) => r[3])));
+			}
+			const r = exportPdfForLLM(threads, (p) => pages.get(p), { ...options, areaOffsets });
+			await navigator.clipboard.writeText(r.text);
+			notice.hide();
+			new Notice(exportSummary(r.stats, options.mode ?? 'full'));
+		} catch (e) {
+			notice.hide();
+			console.error('[pdf-comments]', e);
+			new Notice(`Could not copy: ${e instanceof Error ? e.message : String(e)}`);
+		}
+	}
+
+	/**
+	 * A link to a thread (SPEC §4, DECISIONS D0.5): `#page=N&selection=…&comment=ID`, so it opens
+	 * the thread here and still selects the passage in Obsidian's own viewer.
+	 */
+	async copyLinkToComment(id: string): Promise<void> {
+		const t = this.threads[id];
+		const a = t ? threadAnchor(t) : null;
+		const file = this.pdfPath ? this.host.app.vault.getFileByPath(this.pdfPath) : null;
+		if (!t || !file) return;
+		const seg = a?.segments[0];
+		let selection;
+		if (seg && !a?.area && seg.start !== undefined && seg.end !== undefined && this.texts && !t.detached) {
+			const pt = (await this.texts.get(seg.page)).text;
+			const b = offsetToItem(pt, seg.start, 'start');
+			const e = offsetToItem(pt, seg.end, 'end');
+			if (b && e) selection = { beginIndex: b.index, beginOffset: b.offset, endIndex: e.index, endOffset: e.offset };
+		}
+		const page = seg?.page;
+		const subpath = formatPdfSubpath({ page, selection, comment: id });
+		const link = this.host.app.fileManager.generateMarkdownLink(file, '', subpath, page ? `${file.basename}, p.${page}` : file.basename);
+		await navigator.clipboard.writeText(link);
+		new Notice('Link to the comment copied');
 	}
 
 	// ---- Pointer ----------------------------------------------------------------------
@@ -398,6 +548,7 @@ export class CommentsController {
 			setPriority: (id, p) => this.change(id, (t) => setPriority(t, p)),
 			activate: (id) => this.setActive(id),
 			goTo: (id) => this.activate(id, true),
+			copyLink: (id) => void this.copyLinkToComment(id),
 			hover: (id) => this.setHover(id),
 			isTree: (id) => this.tree.has(id),
 			setTree: (id, tree) => {

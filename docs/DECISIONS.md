@@ -89,3 +89,23 @@ Decisions that fill gaps in, or deviate from, `docs/SPEC.md`. Newest last. Evide
 **F1.5 — The narrow-pane button says what it is:** "💬 3 comments", with the tooltip "Too narrow for the comment margin: open the comments in the sidebar".
 
 **F1.6 — The note's properties are `commented-pdf` and `commented-pdf-fingerprint`** instead of `pdf` and `pdf-fingerprint`: `pdf` is a common property name (literature-note templates, other plugins), and a specific name can't be mistaken for theirs or make their tools treat a comment note as one of their own. Notes written with the old names are still read (only if they contain the data block, D3.2) and get the new names on their next save.
+
+## Phase 4 (Copy for LLM)
+
+**D4.1 — Default scope: the commented passages with context.** Each passage gets about 400 characters on each side, cut at sentence ends where possible, in `<passage page="N">` blocks ("…" where cut); overlapping windows on a page are merged. Other scopes: pages with comments, a page range, the whole document (`<page n="N">` blocks). Also, as in Docs: text and comments, comments only, text only; include resolved threads. The dialog remembers the last choices (in the settings). Docs' "current selection only" is not offered.
+
+**D4.2 — Lines are joined.** PDF line breaks are layout, so the text of a passage or page is one paragraph: a hyphen at a line end between letters is removed, other line breaks become spaces. PDFs that drop such hyphens altogether ("Tempo\nribus") can't be repaired without a dictionary; the notation says hyphenation may not come out perfectly.
+
+**D4.3 — Threads** use Docs' format plus `page="N"` or `pages="N-M"`; area threads have `anchor="[area on page N]"` and a `⟦cN: area on page N⟧` marker before the first line below the area's top. Detached threads keep their last known page. Long quotes (> 200 characters) go in an `<anchor>` element instead of the attribute. Thread rendering is written in `core/llmExport.ts` after Docs' `export.ts` rather than shared, since Docs' version is tied to its Markdown spans.
+
+**D4.4 — Keys:** Ctrl+Alt+C in the PDF view (view scope, like F1.3), a toolbar button, and the command *Copy for LLM*.
+
+## Phase 5 (areas and polish)
+
+**D5.1 — Area comments** are drawn with the area button (one rectangle, then the mode ends) or Alt+drag at any time; a click without dragging (< 8 px) does nothing. While drawing, the text and link layers ignore the pointer. The card shows no picture of the area (the area is outlined on the page next to the card, and the sidebar says "[Area on page N]"): a stored picture would bloat the note, and a live crop needs the page rendered.
+
+**D5.2 — Copy link to comment** (card ⋯ menu and comment menu) writes `#page=N&selection=…&comment=ID` for text comments, so the link selects the passage in Obsidian's own viewer too, and `#page=N&comment=ID` for areas; alias "Name, p.N".
+
+**D5.3 — Settings** are in three groups: opening (open by default, default zoom), comments (folder, renaming, margin width, with the keys listed), page colours (colours, sepia paper colour, dark strength). Settings search (Obsidian 1.13's declarative settings) is not adopted, since `minAppVersion` is 1.8.
+
+**D5.4 — The name stays "PDF Comments"** (id `pdf-comments`) for now; the user hasn't chosen another.

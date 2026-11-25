@@ -4,6 +4,7 @@
 
 import { ItemView, SearchComponent, setIcon, type WorkspaceLeaf } from 'obsidian';
 import { matchingComments } from '../../core/shared/search';
+import { threadAnchor } from '../../core/sidecar';
 import { ThreadCard, type CardHost } from './card';
 import type { CommentsController } from './controller';
 
@@ -134,7 +135,9 @@ export class CommentsSidebarView extends ItemView {
 					this.cards.set(id, card);
 				}
 				const t = threads[id]!;
-				card.render(t, { active: ctl.activeId === id, detached: shownDetached.includes(id), showQuote: true, quote: t.quote });
+				const anchor = threadAnchor(t);
+				const quote = anchor?.area ? `[Area on page ${anchor.segments[0]!.page}]` : t.quote;
+				card.render(t, { active: ctl.activeId === id, detached: shownDetached.includes(id), showQuote: true, quote });
 				el = card.el;
 			}
 			// Keep DOM order without re-inserting unchanged nodes (that would lose focus).

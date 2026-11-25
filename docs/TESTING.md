@@ -56,3 +56,15 @@ Start from `npm run vault:reset` (comment notes of earlier tries are in `test-va
 - Hovering a page shows no "Page N" tooltip.
 - Narrow pane: the button reads "💬 N comments".
 - New comment notes have `commented-pdf:`; a note from an earlier build (with `pdf:`) gets the new property on its next change.
+
+## Phase 4 (Copy for LLM)
+
+- In a commented PDF: Ctrl+Alt+C (or the robot button, or the command). The dialog: *Include* (text and comments / comments only / text only), *Text* (commented passages with context / pages with comments / page range / whole document), pages for a range, resolved comments. *Copy*, then paste into a note or an AI chat: passages with `⟦c1⟧…⟦/c1⟧`, then `<comments>`. A notice says how much was copied.
+- The dialog opens with your last choices.
+
+## Phase 5 (areas and polish)
+
+- **Area comment:** Alt+drag over the figure in `Two-column paper.pdf` (or the dashed-square button, then drag): a blue box, then a card. After saving, the area is outlined in amber. In the sidebar the quote reads "[Area on page 1]". Copy for LLM marks it `⟦cN: area on page 1⟧`.
+- **Copy link to comment:** card ⋯ menu → *Copy link to this comment*; paste and click the link: the PDF opens with that card active. In Obsidian's viewer the same link selects the passage.
+- **Settings:** three groups (opening, comments, page colours).
+- **README.md** describes installing and using the plugin.

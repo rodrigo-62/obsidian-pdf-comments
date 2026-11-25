@@ -3,6 +3,7 @@
 import { App, PluginSettingTab, Setting } from 'obsidian';
 import { isZoomMode, percentLabel, ZOOM_PRESETS, type ZoomMode } from '../core/zoom';
 import type PdfCommentsPlugin from './main';
+import type { LlmChoice } from './comments/llmModal';
 
 export type PageTheme = 'normal' | 'sepia' | 'dark';
 export const PAGE_THEMES: PageTheme[] = ['normal', 'sepia', 'dark'];
@@ -26,6 +27,8 @@ export interface PdfCommentsSettings {
 	sepiaColor: string;
 	/** Strength of the dark page colours' inversion (0.7–1). */
 	darkInvert: number;
+	/** Last choices in the Copy for LLM dialog. */
+	llm: LlmChoice;
 }
 
 export const DEFAULT_SETTINGS: PdfCommentsSettings = {
@@ -37,6 +40,7 @@ export const DEFAULT_SETTINGS: PdfCommentsSettings = {
 	renameNotesWithPdfs: true,
 	sepiaColor: '#f3e7cf',
 	darkInvert: 0.88,
+	llm: { scope: 'context', range: [1, 1], mode: 'full', includeResolved: false },
 };
 
 export function sanitizeSettings(raw: unknown): PdfCommentsSettings {
@@ -51,6 +55,15 @@ export function sanitizeSettings(raw: unknown): PdfCommentsSettings {
 	if (typeof o.commentsFolder === 'string') s.commentsFolder = o.commentsFolder;
 	if (typeof o.renameNotesWithPdfs === 'boolean') s.renameNotesWithPdfs = o.renameNotesWithPdfs;
 	if (typeof o.sepiaColor === 'string' && /^#[0-9a-f]{6}$/i.test(o.sepiaColor)) s.sepiaColor = o.sepiaColor;
+	const llm = o.llm as Partial<LlmChoice> | undefined;
+	if (llm && typeof llm === 'object') {
+		s.llm = {
+			scope: (['context', 'commented-pages', 'range', 'all'] as const).find((x) => x === llm.scope) ?? 'context',
+			range: Array.isArray(llm.range) && llm.range.length === 2 && llm.range.every((n) => Number.isInteger(n) && n >= 1) ? [llm.range[0], llm.range[1]] : [1, 1],
+			mode: (['full', 'comments', 'text'] as const).find((x) => x === llm.mode) ?? 'full',
+			includeResolved: llm.includeResolved === true,
+		};
+	}
 	if (typeof o.darkInvert === 'number' && o.darkInvert >= 0.7 && o.darkInvert <= 1) s.darkInvert = o.darkInvert;
 	return s;
 }
@@ -92,7 +105,10 @@ export class PdfCommentsSettingTab extends PluginSettingTab {
 				});
 			});
 
-		new Setting(containerEl).setName('Comments').setHeading();
+		new Setting(containerEl)
+			.setName('Comments')
+			.setDesc('In a PDF: select text and press Ctrl+Alt+M (or right-click → Add comment); Alt+drag comments on an area; Ctrl+Alt+C copies the PDF and its comments for an AI chat.')
+			.setHeading();
 
 		new Setting(containerEl)
 			.setName('Folder for comment notes')
@@ -131,10 +147,10 @@ export class PdfCommentsSettingTab extends PluginSettingTab {
 					}),
 			);
 
-		new Setting(containerEl).setName('Viewer').setHeading();
+		new Setting(containerEl).setName('Page colours').setHeading();
 
 		new Setting(containerEl)
-			.setName('Page colours')
+			.setName('Colours')
 			.setDesc('Normal, sepia (warm paper) or dark (inverted, pictures keep their hues). Also in the toolbar of every PDF.')
 			.addDropdown((d) => {
 				for (const t of PAGE_THEMES) d.addOption(t, PAGE_THEME_LABELS[t]);

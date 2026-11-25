@@ -389,6 +389,7 @@ export default class PdfCommentsPlugin extends Plugin {
 			});
 		withSelection('add-comment', 'Add comment to the selected text', (v) => void v.comments?.addComment());
 		withSelection('copy-link-to-selection', 'Copy link to selection', (v) => void v.comments?.copyLinkToSelection());
+		withView('copy-for-llm', 'Copy for LLM (text and comments)', (v) => v.comments?.openCopyForLlm());
 		withView('next-comment', 'Go to next comment', (v) => v.comments?.step(1));
 		withView('previous-comment', 'Go to previous comment', (v) => v.comments?.step(-1));
 		withView('toggle-resolved', 'Show or hide resolved comments', (v) => v.toggleResolved());

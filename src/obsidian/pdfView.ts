@@ -77,6 +77,7 @@ export class PdfCommentsView extends FileView {
 	/** SHA-256 of the loaded file (DECISIONS D3.3). */
 	private fingerprint: string | null = null;
 	private resolvedBtn!: HTMLElement;
+	private areaBtn!: HTMLElement;
 	private lastScale = 0;
 
 	private saveLocation = debounce(() => this.persistLocation(), 400, true);
@@ -95,6 +96,10 @@ export class PdfCommentsView extends FileView {
 		// Inside the PDF view only (DECISIONS F1.3); the commands can get other hotkeys.
 		this.scope.register(['Mod', 'Alt'], 'm', () => {
 			void this.comments?.addComment();
+			return false;
+		});
+		this.scope.register(['Mod', 'Alt'], 'c', () => {
+			this.comments?.openCopyForLlm();
 			return false;
 		});
 	}
@@ -168,8 +173,10 @@ export class PdfCommentsView extends FileView {
 		this.toolButton(tb, 'zoom-in', 'Zoom in', () => this.zoomStep(1));
 		tb.createDiv({ cls: 'pdfc-toolbar-spacer' });
 		this.toolButton(tb, 'message-square-plus', 'Add comment (select text first)', () => void this.comments?.addComment());
+		this.areaBtn = this.toolButton(tb, 'square-dashed-mouse-pointer', 'Comment on an area (or Alt+drag)', () => this.comments?.setAreaMode(!this.comments.areaMode));
 		this.resolvedBtn = this.toolButton(tb, 'check-check', 'Show resolved comments', () => this.toggleResolved());
 		this.toolButton(tb, 'panel-right', 'Comments sidebar', () => void this.plugin.openSidebar());
+		this.toolButton(tb, 'bot', 'Copy for LLM (Ctrl+Alt+C)', () => this.comments?.openCopyForLlm());
 		tb.createDiv({ cls: 'pdfc-toolbar-sep' });
 		this.toolButton(tb, 'search', 'Find', () => this.openFind());
 		this.themeBtn = this.toolButton(tb, PAGE_THEME_ICONS[this.plugin.settings.pageTheme], 'Page colours', () => undefined);
@@ -243,9 +250,15 @@ export class PdfCommentsView extends FileView {
 			currentPage: () => viewer.currentPageNumber,
 			setMarginVisible: (v) => this.setMarginVisible(v),
 			commentDoc: (path) => this.plugin.commentDoc(path),
+			llmChoice: () => this.plugin.settings.llm,
+			setLlmChoice: (c) => {
+				this.plugin.settings.llm = c;
+				void this.plugin.saveSettings();
+			},
 			openSidebar: () => void this.plugin.openSidebar(),
 			changed: () => {
 				this.resolvedBtn?.toggleClass('is-active', comments.showResolved);
+				this.areaBtn?.toggleClass('is-active', comments.areaMode);
 				this.plugin.commentsChanged(this);
 			},
 		});
@@ -267,7 +280,7 @@ export class PdfCommentsView extends FileView {
 		const labels = new MutationObserver((records) => {
 			for (const r of records) {
 				if (r.type === 'attributes') unlabel(r.target as Element);
-				else r.addedNodes.forEach((n) => n instanceof Element && unlabel(n));
+				else r.addedNodes.forEach((n) => n.instanceOf(Element) && unlabel(n));
 			}
 		});
 		labels.observe(this.pagesEl, { subtree: true, childList: true, attributes: true, attributeFilter: ['aria-label'] });

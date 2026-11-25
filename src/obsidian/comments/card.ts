@@ -23,6 +23,8 @@ export interface CardHost {
 	activate(id: string): void;
 	/** Scroll the editor so the thread's text is in the middle of the view, and select it. */
 	goTo(id: string): void;
+	/** Copy a link to the thread (PDF Comments). */
+	copyLink?: (id: string) => void;
 	hover(id: string | null): void;
 	/** Tree view on/off for a thread (session state). */
 	isTree(id: string): boolean;
@@ -175,7 +177,7 @@ export class ThreadCard {
 		const priority = threadPriority(thread);
 		if (priority !== 'normal') meta.createSpan({ cls: `pdfc-badge pdfc-priority-badge is-${priority}`, text: PRIORITY_LABELS[priority], attr: { 'aria-label': `${PRIORITY_LABELS[priority]} priority` } });
 		if (thread.resolved) meta.createSpan({ cls: 'pdfc-badge', text: 'Resolved' });
-		if (this.state?.detached) meta.createSpan({ cls: 'pdfc-badge pdfc-badge-detached', text: 'Detached', attr: { 'aria-label': 'The commented text was deleted' } });
+		if (this.state?.detached) meta.createSpan({ cls: 'pdfc-badge pdfc-badge-detached', text: 'Detached', attr: { 'aria-label': 'The passage was not found in the current version of the PDF' } });
 		if (root) meta.createSpan({ cls: 'pdfc-date', text: shortDate(root.created), attr: { 'aria-label': fullDate(root.created) } });
 		const actions = h.createDiv({ cls: 'pdfc-card-actions' });
 		if (thread.comments.length > 1) {
@@ -205,6 +207,8 @@ export class ThreadCard {
 			if (root) menu.addItem((i) => i.setTitle('Edit comment').setIcon('pencil').onClick(() => this.startEdit(root.id)));
 			if (root && !thread.resolved && thread.comments.length > 1) menu.addItem((i) => i.setTitle('Reply to the first comment').setIcon('reply').onClick(() => this.setReplyTarget(root.id)));
 			menu.addItem((i) => i.setTitle(this.tree ? 'Show in time order' : 'Show as tree').setIcon('git-branch').onClick(() => this.host.setTree(this.id, !this.tree)));
+			const copyLink = this.host.copyLink;
+			if (copyLink) menu.addItem((i) => i.setTitle('Copy link to this comment').setIcon('link').onClick(() => copyLink(this.id)));
 			this.priorityItems(menu, thread);
 			menu.addSeparator();
 			menu.addItem((i) =>
@@ -378,6 +382,8 @@ export class ThreadCard {
 				.onClick(() => void navigator.clipboard.writeText(c.body).then(() => new Notice('Comment copied'))),
 		);
 		menu.addItem((i) => i.setTitle('Go to the commented text').setIcon('locate').onClick(() => this.host.goTo(this.id)));
+		const copyLink = this.host.copyLink;
+		if (copyLink) menu.addItem((i) => i.setTitle('Copy link to this comment').setIcon('link').onClick(() => copyLink(this.id)));
 		if (t) this.priorityItems(menu, t);
 		menu.addSeparator();
 		if (t) menu.addItem((i) => i.setTitle(t.resolved ? 'Re-open thread' : 'Resolve thread').setIcon(t.resolved ? 'rotate-ccw' : 'check').onClick(() => this.host.resolve(this.id, !t.resolved)));
