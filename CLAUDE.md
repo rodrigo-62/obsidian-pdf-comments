@@ -17,7 +17,10 @@ A PDF view for Obsidian with Google-Docs-like margin comments. Sister project of
 
 - Spec drafted (2026-11-25); the user answered storage (one folder), default view (yes) and digest (yes). Only the name is still open.
 - **Phase 0 done** (2026-11-25): scaffold, test vault (`npm run vault:reset`, Typst + qpdf), harness (`scripts/obsidian-headless.sh`, port 9335, `OBSIDIAN_ELECTRON` for Electron 40 checks), research (`docs/RESEARCH.md`), decisions D0.1–D0.5.
-- **Next:** waiting for the user to decide whether to keep building given Annotator 0.3 (RESEARCH §4). If yes: Phase 1 (viewer).
+- The user chose to keep building despite Annotator 0.3 (2026-11-25).
+- **Phase 1 done** (viewer, DECISIONS D1.1–D1.9): `src/obsidian/pdfView.ts` (FileView on PDF.js viewer components), `findBar.ts`, `outlinePanel.ts`, `passwordModal.ts`, `settings.ts`, `main.ts` (open-by-default patch, switch buttons, commands, hand-back on disable); core `subpath.ts`, `zoom.ts`, `viewStates.ts` with tests.
+- **Next:** Phase 2 (anchor and storage core).
+- Harness notes: background tabs are *deferred* (`leaf.isDeferred`, `iterateAllLeaves` skips them; walk `workspace.rootSplit` instead). Obsidian 1.15 modals have no `.modal-close-button`. The plugin loaded at harness start is the build at that moment; reload it with disablePlugin/enablePlugin after a rebuild.
 
 ## Commands (inside `nix develop`)
 

@@ -1,0 +1,206 @@
+/* The PDF view (SPEC §3). Obsidian's own PDF classes (.pdf-container,
+   .pdf-viewer-container, .pdfViewer) give the pages their look; these rules
+   add our layout around them. */
+
+.pdfc-view.view-content {
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+	--pdfc-margin-width: 320px;
+}
+
+/* ---- Toolbar ---- */
+.pdfc-toolbar {
+	display: flex;
+	align-items: center;
+	gap: var(--size-2-1);
+	padding: var(--size-2-1) var(--size-4-2);
+	border-bottom: var(--border-width) solid var(--background-modifier-border);
+	background-color: var(--background-primary);
+	flex-shrink: 0;
+	min-height: 36px;
+	overflow-x: auto;
+}
+.pdfc-toolbar-sep {
+	width: var(--border-width);
+	align-self: stretch;
+	margin: var(--size-2-1) var(--size-2-2);
+	background-color: var(--background-modifier-border);
+}
+.pdfc-toolbar-spacer {
+	flex: 1;
+}
+.pdfc-tool.is-active {
+	color: var(--interactive-accent);
+	background-color: var(--background-modifier-hover);
+}
+.pdfc-page-box {
+	display: flex;
+	align-items: center;
+	gap: var(--size-2-2);
+	font-size: var(--font-ui-small);
+	color: var(--text-muted);
+	white-space: nowrap;
+}
+.pdfc-page-box input.pdfc-page-input {
+	width: 4.5em;
+	height: 26px;
+	padding: 0 var(--size-2-2);
+	text-align: center;
+	font-size: var(--font-ui-small);
+}
+.pdfc-zoom select.dropdown {
+	height: 26px;
+	font-size: var(--font-ui-small);
+	padding-top: 0;
+	padding-bottom: 0;
+	min-width: 7.5em;
+}
+
+/* ---- Body: outline | pages ---- */
+.pdfc-body {
+	flex: 1;
+	display: flex;
+	min-height: 0;
+}
+.pdfc-main.pdf-container {
+	min-width: 200px;
+}
+.pdfc-scroll:focus,
+.pdfc-scroll:focus-visible {
+	outline: none;
+	box-shadow: none;
+}
+/* Room for the comment margin (Phase 3) to the right of the pages. */
+.pdfc-has-margin .pdfc-scroll .pdfViewer {
+	margin-right: var(--pdfc-margin-width);
+}
+
+/* ---- Dark pages: invert what PDF.js painted, keep hues ---- */
+.pdfc-dark-pages .pdfViewer .page .canvasWrapper canvas {
+	filter: invert(1) hue-rotate(180deg);
+}
+
+/* ---- Outline ---- */
+.pdfc-outline {
+	width: 260px;
+	flex-shrink: 0;
+	display: flex;
+	flex-direction: column;
+	border-right: var(--border-width) solid var(--background-modifier-border);
+	background-color: var(--background-secondary);
+	min-height: 0;
+}
+.pdfc-outline-title {
+	padding: var(--size-4-2) var(--size-4-3) var(--size-2-2);
+	font-size: var(--font-ui-small);
+	font-weight: var(--font-semibold);
+	color: var(--text-muted);
+}
+.pdfc-outline-list {
+	overflow-y: auto;
+	padding: 0 var(--size-2-2) var(--size-4-4);
+	flex: 1;
+}
+.pdfc-outline-row {
+	display: flex;
+	align-items: flex-start;
+	padding-left: calc(var(--pdfc-depth, 0) * 14px);
+	border-radius: var(--radius-s);
+}
+.pdfc-outline-row:hover {
+	background-color: var(--background-modifier-hover);
+}
+.pdfc-outline-twisty {
+	width: 18px;
+	height: 22px;
+	flex-shrink: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--text-faint);
+}
+.pdfc-outline-twisty.is-clickable {
+	cursor: var(--cursor);
+}
+.pdfc-outline-twisty svg {
+	width: 14px;
+	height: 14px;
+}
+.pdfc-outline-label {
+	flex: 1;
+	padding: 3px var(--size-2-2) 3px 0;
+	font-size: var(--font-ui-small);
+	line-height: 1.35;
+	color: var(--text-normal);
+	cursor: var(--cursor);
+	overflow-wrap: anywhere;
+}
+.pdfc-outline-empty {
+	padding: var(--size-4-2);
+	font-size: var(--font-ui-small);
+	color: var(--text-faint);
+}
+
+/* ---- Find bar ---- */
+.pdfc-findbar {
+	position: absolute;
+	top: var(--size-4-2);
+	right: var(--size-4-6);
+	max-width: calc(100% - 2 * var(--size-4-3));
+	z-index: 20;
+	display: flex;
+	align-items: center;
+	gap: var(--size-2-1);
+	padding: var(--size-2-2);
+	background-color: var(--background-primary);
+	border: var(--border-width) solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	box-shadow: var(--shadow-s);
+}
+.pdfc-findbar input.pdfc-find-input {
+	width: 200px;
+	min-width: 60px;
+	flex: 0 1 auto;
+	height: 26px;
+	font-size: var(--font-ui-small);
+}
+.pdfc-findbar.is-not-found input.pdfc-find-input {
+	border-color: var(--text-error);
+}
+.pdfc-find-count {
+	flex-shrink: 0;
+	min-width: 5.5em;
+	text-align: center;
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+	white-space: nowrap;
+}
+.pdfc-find-btn.is-active {
+	color: var(--interactive-accent);
+	background-color: var(--background-modifier-hover);
+}
+
+/* ---- Loading / error message ---- */
+.pdfc-message {
+	position: absolute;
+	inset: 0;
+	z-index: 10;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: var(--size-4-3);
+	padding: var(--size-4-8);
+	text-align: center;
+	color: var(--text-muted);
+	background-color: var(--pdf-background, var(--background-secondary));
+}
+.pdfc-message-actions {
+	display: flex;
+	gap: var(--size-4-2);
+}
+.pdfc-find-btn {
+	flex-shrink: 0;
+}
