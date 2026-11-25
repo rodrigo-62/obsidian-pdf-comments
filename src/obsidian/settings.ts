@@ -4,6 +4,7 @@ import { App, PluginSettingTab, Setting } from 'obsidian';
 import { isZoomMode, percentLabel, ZOOM_PRESETS, type ZoomMode } from '../core/zoom';
 import type PdfCommentsPlugin from './main';
 import type { LlmChoice } from './comments/llmModal';
+import { HIGHLIGHT_COLORS, type HighlightColor } from '../core/sidecar';
 
 export type PageTheme = 'normal' | 'sepia' | 'dark';
 export const PAGE_THEMES: PageTheme[] = ['normal', 'sepia', 'dark'];
@@ -29,6 +30,8 @@ export interface PdfCommentsSettings {
 	darkInvert: number;
 	/** Last choices in the Copy for LLM dialog. */
 	llm: LlmChoice;
+	/** Last highlight colour used. */
+	highlightColor: HighlightColor;
 }
 
 export const DEFAULT_SETTINGS: PdfCommentsSettings = {
@@ -41,6 +44,7 @@ export const DEFAULT_SETTINGS: PdfCommentsSettings = {
 	sepiaColor: '#f3e7cf',
 	darkInvert: 0.88,
 	llm: { scope: 'context', range: [1, 1], mode: 'full', includeResolved: false },
+	highlightColor: 'yellow',
 };
 
 export function sanitizeSettings(raw: unknown): PdfCommentsSettings {
@@ -55,6 +59,7 @@ export function sanitizeSettings(raw: unknown): PdfCommentsSettings {
 	if (typeof o.commentsFolder === 'string') s.commentsFolder = o.commentsFolder;
 	if (typeof o.renameNotesWithPdfs === 'boolean') s.renameNotesWithPdfs = o.renameNotesWithPdfs;
 	if (typeof o.sepiaColor === 'string' && /^#[0-9a-f]{6}$/i.test(o.sepiaColor)) s.sepiaColor = o.sepiaColor;
+	s.highlightColor = HIGHLIGHT_COLORS.find((c) => c === o.highlightColor) ?? 'yellow';
 	const llm = o.llm as Partial<LlmChoice> | undefined;
 	if (llm && typeof llm === 'object') {
 		s.llm = {

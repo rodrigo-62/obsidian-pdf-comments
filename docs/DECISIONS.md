@@ -108,4 +108,12 @@ Decisions that fill gaps in, or deviate from, `docs/SPEC.md`. Newest last. Evide
 
 **D5.3 — Settings** are in three groups: opening (open by default, default zoom), comments (folder, renaming, margin width, with the keys listed), page colours (colours, sepia paper colour, dark strength). Settings search (Obsidian 1.13's declarative settings) is not adopted, since `minAppVersion` is 1.8.
 
-**D5.4 — The name stays "PDF Comments"** (id `pdf-comments`) for now; the user hasn't chosen another.
+**D5.4 — The name is "PDF Comments"** (id `pdf-comments`), confirmed by the user.
+
+## Highlights (user request, after Phase 5)
+
+**H1.1 — A highlight is a thread without comments**, stored in the same note and block (`"comments": []`, `"color": "green"`). So it is anchored, re-anchored, renamed and linked like a comment, with no new storage. It has no card and isn't counted or visited as a comment (margin, "💬 N", next/previous, sidebar). Adding a comment to it turns it into a normal comment thread that keeps its colour; a comment's colour stays changeable only on highlights. SPEC §9 had "highlights without a comment" as a non-goal, with this very idea as the "maybe later".
+
+**H1.2 — Colours:** yellow, green, blue, pink, purple (`--pdfc-color-*`, changeable in a CSS snippet); the last one used is remembered (settings) and used by Ctrl+Alt+H (view scope, like F1.3), the toolbar highlighter and the command; the right-click menu offers the others. Clicking a highlight opens its menu: colour, *Add comment*, *Copy link to this highlight*, *Copy text*, *Remove highlight*.
+
+**H1.3 — Digest and export:** the digest lists a highlight like a thread, tagged "Highlight (colour)", without a comment list. Copy for LLM writes highlights as `==text==` (Docs' notation for highlights without comments), also in "text only" (they aren't comments) but not in "comments only"; the "commented passages with context" scope includes highlighted passages too.

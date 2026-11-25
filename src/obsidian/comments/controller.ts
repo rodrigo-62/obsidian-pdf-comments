@@ -6,7 +6,7 @@ import { anchorStart, compareAnchors, cssRectToPdf, pdfRectToCss, roundRect, typ
 import { offsetToItem } from '../../core/pageText';
 import { generateId } from '../../core/ids';
 import { addReply, createThread, deleteComment, editComment, setPriority, setResolved, type Priority } from '../../core/shared/model';
-import { threadAnchor, type PdfThread, type PdfThreads } from '../../core/sidecar';
+import { HIGHLIGHT_COLORS, isHighlight, threadAnchor, threadColor, type HighlightColor, type PdfThread, type PdfThreads } from '../../core/sidecar';
 import { formatPdfSubpath } from '../../core/subpath';
 import { areaTextOffset, exportPdfForLLM, exportSummary, pagesNeeded, type PdfExportOptions } from '../../core/llmExport';
 import { CopyForLlmModal, type LlmChoice } from './llmModal';
@@ -34,6 +34,9 @@ export interface ControllerHost {
 	/** Last choices in the Copy for LLM dialog (remembered in the settings). */
 	llmChoice(): LlmChoice;
 	setLlmChoice(choice: LlmChoice): void;
+	/** Last highlight colour used (remembered in the settings). */
+	highlightColor(): HighlightColor;
+	setHighlightColor(color: HighlightColor): void;
 	openSidebar(): void;
 	/** Comments or UI state changed (the sidebar listens). */
 	changed(): void;
@@ -42,7 +45,11 @@ export interface ControllerHost {
 interface Draft {
 	anchor: Anchor;
 	quote: string;
+	/** Adding the first comment to this highlight (instead of a new thread). */
+	highlightId?: string;
 }
+
+const COLOR_LABELS: Record<HighlightColor, string> = { yellow: 'Yellow', green: 'Green', blue: 'Blue', pink: 'Pink', purple: 'Purple' };
 
 export class CommentsController {
 	doc: CommentDoc | null = null;
@@ -207,7 +214,7 @@ export class CommentsController {
 		const anchored: [string, Anchor][] = [];
 		const detached: string[] = [];
 		for (const [id, t] of Object.entries(this.threads)) {
-			if (!this.visible(t)) continue;
+			if (isHighlight(t) || !this.visible(t)) continue;
 			const a = threadAnchor(t);
 			if (a && !t.detached) anchored.push([id, a]);
 			else detached.push(id);
@@ -227,7 +234,12 @@ export class CommentsController {
 		for (const id of anchored) {
 			const t = threads[id]!;
 			const a = threadAnchor(t)!;
-			for (const s of a.segments) items.push({ id, page: s.page, rects: s.rects, area: a.area === true, resolved: t.resolved });
+			for (const s of a.segments) items.push({ id, page: s.page, rects: s.rects, area: a.area === true, resolved: t.resolved, color: threadColor(t) });
+		}
+		for (const [id, t] of Object.entries(threads)) {
+			const a = threadAnchor(t);
+			if (!isHighlight(t) || !a || t.detached || id === this.draft?.highlightId) continue;
+			for (const s of a.segments) items.push({ id, page: s.page, rects: s.rects, area: a.area === true, resolved: false, highlight: true, color: threadColor(t) ?? 'yellow' });
 		}
 		if (this.draft) for (const s of this.draft.anchor.segments) items.push({ id: DRAFT_ID, page: s.page, rects: s.rects, area: this.draft.anchor.area === true, resolved: false });
 		const before = new Set(this.highlights.pagesWithItems());
@@ -354,6 +366,22 @@ export class CommentsController {
 		const draft = this.draft;
 		const doc = this.doc;
 		if (!draft || !doc || !text.trim()) return;
+		if (draft.highlightId) {
+			const hid = draft.highlightId;
+			const ok = await doc.update((threads) => {
+				const t = threads[hid];
+				if (!t) return threads;
+				const first = createThread(t.quote, text).comments;
+				let next: PdfThread = { ...t, created: first[0]!.created, comments: first };
+				if (priority !== 'normal') next = setPriority(next, priority);
+				return { ...threads, [hid]: next };
+			});
+			if (!ok) return;
+			this.draft = null;
+			this.activeId = hid;
+			this.render();
+			return;
+		}
 		let id = '';
 		const ok = await doc.update((threads) => {
 			id = generateId(Object.keys(threads));
@@ -383,6 +411,78 @@ export class CommentsController {
 		const link = this.host.app.fileManager.generateMarkdownLink(file, '', formatPdfSubpath({ page: r.page, selection: r.ref }), `${file.basename}, p.${r.page}`);
 		await navigator.clipboard.writeText(link);
 		new Notice('Link to the selection copied');
+	}
+
+	// ---- Highlights (DECISIONS H1) --------------------------------------------------------
+
+	/** Highlights the selected text (a thread without comments) in `color` or the last colour. */
+	async highlightSelection(color?: HighlightColor): Promise<void> {
+		if (!this.doc || !this.texts) return;
+		if (this.doc.error) {
+			new Notice(`The comments of this PDF can't be changed: ${this.doc.error}`);
+			return;
+		}
+		const sel = await anchorFromSelection(this.selHost);
+		if (!sel) {
+			new Notice('Select some text in the PDF first.');
+			return;
+		}
+		const c = color ?? this.host.highlightColor();
+		this.host.setHighlightColor(c);
+		this.host.pagesEl.win.getSelection()?.removeAllRanges();
+		await this.doc.update((threads) => {
+			const id = generateId(Object.keys(threads));
+			const now = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
+			return { ...threads, [id]: { anchor: sel.anchor, quote: sel.quote, created: now, resolved: false, color: c, comments: [] } };
+		});
+	}
+
+	private highlightMenu(e: MouseEvent, id: string): void {
+		const t = this.threads[id];
+		if (!t) return;
+		const menu = new Menu();
+		const current = threadColor(t) ?? 'yellow';
+		for (const col of HIGHLIGHT_COLORS) {
+			menu.addItem((i) =>
+				i
+					.setTitle(COLOR_LABELS[col])
+					.setChecked(col === current)
+					.onClick(() => {
+						this.host.setHighlightColor(col);
+						this.change(id, (x) => ({ ...x, color: col }));
+					}),
+			);
+		}
+		menu.addSeparator();
+		menu.addItem((i) =>
+			i
+				.setTitle('Add comment')
+				.setIcon('message-square-plus')
+				.onClick(() => {
+					const a = threadAnchor(t);
+					if (a) this.startDraft({ anchor: a, quote: t.quote, highlightId: id });
+				}),
+		);
+		menu.addItem((i) =>
+			i
+				.setTitle('Copy link to this highlight')
+				.setIcon('link')
+				.onClick(() => void this.copyLinkToComment(id)),
+		);
+		menu.addItem((i) =>
+			i
+				.setTitle('Copy text')
+				.setIcon('copy')
+				.onClick(() => void navigator.clipboard.writeText(t.quote)),
+		);
+		menu.addItem((i) =>
+			i
+				.setTitle('Remove highlight')
+				.setIcon('eraser')
+				.setWarning(true)
+				.onClick(() => this.change(id, () => null)),
+		);
+		showMenu(menu, e);
 	}
 
 	// ---- Copy for LLM (SPEC §6) -------------------------------------------------------
@@ -472,6 +572,12 @@ export class CommentsController {
 			if (this.activeId) this.setActive(null);
 			return;
 		}
+		// A highlight without comments: its menu (colour, add comment, remove).
+		const top = this.threads[hits[0]!];
+		if (top && isHighlight(top)) {
+			this.highlightMenu(e, hits[0]!);
+			return;
+		}
 		// Clicking again where comments overlap goes to the next one.
 		const i = this.activeId ? hits.indexOf(this.activeId) : -1;
 		this.setActive(hits[(i + 1) % hits.length]!);
@@ -495,18 +601,39 @@ export class CommentsController {
 			i
 				.setTitle('Add comment')
 				.setIcon('message-square-plus')
+				.setSection('comment')
 				.onClick(() => void this.addComment()),
 		);
+		const last = this.host.highlightColor();
+		menu.addItem((i) =>
+			i
+				.setTitle('Highlight')
+				.setIcon('highlighter')
+				.setSection('highlight')
+				.onClick(() => void this.highlightSelection(last)),
+		);
+		for (const col of HIGHLIGHT_COLORS) {
+			if (col === last) continue;
+			menu.addItem((i) =>
+				i
+					.setTitle(`Highlight in ${COLOR_LABELS[col].toLowerCase()}`)
+					.setIcon('highlighter')
+					.setSection('highlight')
+					.onClick(() => void this.highlightSelection(col)),
+			);
+		}
 		menu.addItem((i) =>
 			i
 				.setTitle('Copy link to selection')
 				.setIcon('link')
+				.setSection('copy')
 				.onClick(() => void this.copyLinkToSelection()),
 		);
 		menu.addItem((i) =>
 			i
 				.setTitle('Copy')
 				.setIcon('copy')
+				.setSection('copy')
 				.onClick(() => {
 					const text = this.host.pagesEl.win.getSelection()?.toString() ?? '';
 					void navigator.clipboard.writeText(text);

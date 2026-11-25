@@ -1,6 +1,6 @@
 # PDF Comments — margin comments on PDFs in Obsidian
 
-> Working name: **PDF Comments** (plugin id `pdf-comments`, CSS prefix `pdfc`). Rename freely before the first release.
+> Name: **PDF Comments** (plugin id `pdf-comments`, CSS prefix `pdfc`), confirmed.
 
 ## 0. Instructions for Claude Code
 
@@ -235,7 +235,7 @@ Not reused: markers, CodeMirror integration, page view / themes, footnotes, read
 
 - Changing the PDF file in any way (annotations, form filling, ink, signatures).
 - Reading or showing annotations that are already inside the PDF beyond what PDF.js renders by default.
-- Highlights without a comment (Zotero-style colour highlighting). Maybe later: a thread with an empty body would do.
+- ~~Highlights without a comment~~: added after Phase 5 (DECISIONS H1).
 - EPUB and other formats. Embeds. Mobile. Multi-user or sync logic.
 - OCR for scanned PDFs (area comments cover them).
 

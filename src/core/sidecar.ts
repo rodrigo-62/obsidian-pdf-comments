@@ -34,6 +34,21 @@ export interface PdfThread extends Thread {
 	anchor?: unknown;
 	/** Set when the quote could not be found in the current PDF (shown under "Detached"). */
 	detached?: boolean;
+	/** Highlight colour (HIGHLIGHT_COLORS); absent = the default comment colour. */
+	color?: string;
+}
+
+/** Highlight colours (DECISIONS H1.2). */
+export const HIGHLIGHT_COLORS = ['yellow', 'green', 'blue', 'pink', 'purple'] as const;
+export type HighlightColor = (typeof HIGHLIGHT_COLORS)[number];
+
+/** A highlight is a thread without comments (DECISIONS H1.1). */
+export function isHighlight(t: PdfThread): boolean {
+	return t.comments.length === 0;
+}
+
+export function threadColor(t: PdfThread): HighlightColor | null {
+	return HIGHLIGHT_COLORS.find((c) => c === t.color) ?? null;
 }
 
 export type PdfThreads = Record<string, PdfThread>;
@@ -165,7 +180,7 @@ export function parseSidecar(md: string): SidecarParse {
 	return { ok: true, data: { pdfLink, fingerprint, threads } };
 }
 
-const THREAD_KEYS = ['anchor', 'quote', 'created', 'resolved', 'resolvedAt', 'detached', 'comments'];
+const THREAD_KEYS = ['anchor', 'quote', 'created', 'resolved', 'resolvedAt', 'detached', 'color', 'comments'];
 const COMMENT_KEYS = ['id', 'parent', 'created', 'edited', 'body'];
 const ANCHOR_KEYS = ['segments', 'prefix', 'suffix', 'area'];
 const SEGMENT_KEYS = ['page', 'start', 'end', 'rects'];

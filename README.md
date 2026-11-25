@@ -21,6 +21,11 @@ It is the sister plugin of **Docs** (margin comments for Markdown notes) and use
 - *Go to next / previous comment*, *Show resolved comments*, a comments sidebar with search (also used when the pane is too narrow for the margin: a "💬 N comments" button opens it).
 - **Copy link to selection** (Obsidian's own `#page=…&selection=…` format) and **Copy link to comment**.
 
+**Highlights**
+- Select text, then **Ctrl+Alt+H**, the highlighter button, or right-click → *Highlight* (yellow, green, blue, pink or purple; the last colour is remembered).
+- Click a highlight to change its colour, add a comment to it, copy a link to it, or remove it.
+- Highlights are kept with the comments, listed in the comment note, and written as `==text==` by Copy for LLM.
+
 **Copy for LLM** (Ctrl+Alt+C or the robot button)
 - Copies the commented passages with some context (or the pages with comments, a page range, or the whole PDF), with every comment written out: commented ranges become numbered markers `⟦c1⟧…⟦/c1⟧`, threads follow with page, dates and reply structure, and a short notation block explains the format.
 

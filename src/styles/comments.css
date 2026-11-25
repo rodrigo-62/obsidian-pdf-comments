@@ -610,3 +610,31 @@ input.pdfc-range-input {
 	border-color: var(--interactive-accent);
 	background-color: color-mix(in srgb, var(--interactive-accent) 12%, transparent);
 }
+
+/* ---- Highlights without comments (DECISIONS H1) ---- */
+.pdfc-view {
+	--pdfc-color-yellow: rgba(255, 212, 0, 0.42);
+	--pdfc-color-green: rgba(90, 200, 90, 0.38);
+	--pdfc-color-blue: rgba(80, 160, 255, 0.36);
+	--pdfc-color-pink: rgba(255, 110, 170, 0.36);
+	--pdfc-color-purple: rgba(170, 120, 255, 0.36);
+}
+.pdfc-hl.pdfc-color-yellow { background-color: var(--pdfc-color-yellow); }
+.pdfc-hl.pdfc-color-green { background-color: var(--pdfc-color-green); }
+.pdfc-hl.pdfc-color-blue { background-color: var(--pdfc-color-blue); }
+.pdfc-hl.pdfc-color-pink { background-color: var(--pdfc-color-pink); }
+.pdfc-hl.pdfc-color-purple { background-color: var(--pdfc-color-purple); }
+/* a highlight has no card: hovering shows a thin underline instead of the comment emphasis */
+.pdfc-hl.is-highlight.is-hover {
+	box-shadow: 0 2px 0 color-mix(in srgb, var(--text-normal) 45%, transparent);
+}
+/* comments with a colour keep it, a little stronger while active */
+.pdfc-hl[class*='pdfc-color-'].is-active,
+.pdfc-hl[class*='pdfc-color-'].is-hover:not(.is-highlight) {
+	filter: saturate(1.6);
+}
+/* dark pages: plain translucent colours (multiply would hide them) */
+.pdfc-theme-dark .pdfc-hl[class*='pdfc-color-'] {
+	mix-blend-mode: normal;
+	opacity: 0.85;
+}

@@ -98,6 +98,10 @@ export class PdfCommentsView extends FileView {
 			void this.comments?.addComment();
 			return false;
 		});
+		this.scope.register(['Mod', 'Alt'], 'h', () => {
+			void this.comments?.highlightSelection();
+			return false;
+		});
 		this.scope.register(['Mod', 'Alt'], 'c', () => {
 			this.comments?.openCopyForLlm();
 			return false;
@@ -172,7 +176,8 @@ export class PdfCommentsView extends FileView {
 		});
 		this.toolButton(tb, 'zoom-in', 'Zoom in', () => this.zoomStep(1));
 		tb.createDiv({ cls: 'pdfc-toolbar-spacer' });
-		this.toolButton(tb, 'message-square-plus', 'Add comment (select text first)', () => void this.comments?.addComment());
+		this.toolButton(tb, 'message-square-plus', 'Add comment to the selected text (Ctrl+Alt+M)', () => void this.comments?.addComment());
+		this.toolButton(tb, 'highlighter', 'Highlight the selected text (Ctrl+Alt+H)', () => void this.comments?.highlightSelection());
 		this.areaBtn = this.toolButton(tb, 'square-dashed-mouse-pointer', 'Comment on an area (or Alt+drag)', () => this.comments?.setAreaMode(!this.comments.areaMode));
 		this.resolvedBtn = this.toolButton(tb, 'check-check', 'Show resolved comments', () => this.toggleResolved());
 		this.toolButton(tb, 'panel-right', 'Comments sidebar', () => void this.plugin.openSidebar());
@@ -250,6 +255,11 @@ export class PdfCommentsView extends FileView {
 			currentPage: () => viewer.currentPageNumber,
 			setMarginVisible: (v) => this.setMarginVisible(v),
 			commentDoc: (path) => this.plugin.commentDoc(path),
+			highlightColor: () => this.plugin.settings.highlightColor,
+			setHighlightColor: (c) => {
+				this.plugin.settings.highlightColor = c;
+				void this.plugin.saveSettings();
+			},
 			llmChoice: () => this.plugin.settings.llm,
 			setLlmChoice: (c) => {
 				this.plugin.settings.llm = c;

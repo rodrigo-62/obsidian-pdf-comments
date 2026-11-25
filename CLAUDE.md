@@ -1,4 +1,4 @@
-# PDF Comments (working name) — Obsidian plugin
+# PDF Comments — Obsidian plugin
 
 A PDF view for Obsidian with Google-Docs-like margin comments. Sister project of the Docs plugin (`/home/parrhasius/code/projects/obsidian-docs-plugin`), whose comment code is reused here.
 
@@ -23,7 +23,8 @@ A PDF view for Obsidian with Google-Docs-like margin comments. Sister project of
 - **Phase 3 done** (DECISIONS D3.1–D3.9): `src/obsidian/comments/` (noteStore, commentDoc, controller, highlights, margin, selection, pageTexts, sidebarView, and card/composer/menus from Docs), `src/styles/comments.css`; page colours normal/sepia/dark (user request); "Copy link to selection" (side-agent note).
 - **Feedback round 1 done** (DECISIONS F1.1–F1.6), incl. the `commented-pdf` property.
 - **Phase 4 done** (D4.1–D4.4): `src/core/llmExport.ts`, `comments/llmModal.ts`. **Phase 5 done** (D5.1–D5.4): area comments, copy link to comment, settings groups, README.
-- **Next:** wait for the user's feedback. Still open: the name; sidebar search stepping (Docs-style); popout windows untested.
+- **Highlights done** (DECISIONS H1.1–H1.3). Name confirmed: "PDF Comments".
+- **Next:** wait for the user's feedback. Still open: sidebar search stepping (Docs-style); popout windows untested.
 - Harness notes: background tabs are *deferred* (`leaf.isDeferred`, `iterateAllLeaves` skips them; walk `workspace.rootSplit` instead). Obsidian 1.15 modals have no `.modal-close-button`. Renames in the harness trigger Obsidian's "Update links?" dialog unless `app.vault.setConfig('alwaysUpdateLinks', true)` is set first. The plugin loaded at harness start is the build at that moment; reload it with disablePlugin/enablePlugin after a rebuild.
 
 ## Commands (inside `nix develop`)

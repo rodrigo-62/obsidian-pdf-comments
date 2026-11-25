@@ -4,6 +4,7 @@ import { buildPageText } from '../src/core/pageText';
 import { contextOf, type Anchor, type Rect, type TextItemGeom } from '../src/core/anchor';
 import { exportPdfForLLM, exportSummary, pagesNeeded, unwrap, type PdfExportOptions } from '../src/core/llmExport';
 import type { PdfThread, PdfThreads } from '../src/core/sidecar';
+import { renderDigest } from '../src/core/digest';
 
 const fx = JSON.parse(readFileSync(new URL('./fixtures/lighthouses-v1.json', import.meta.url), 'utf8')) as { pages: { items: TextItemGeom[] }[] };
 const texts = fx.pages.map((p) => buildPageText(p.items).text);
@@ -62,7 +63,7 @@ describe('exportPdfForLLM', () => {
 		expect(p1).toContain('⟦c1⟧The improve');
 		expect(p1).not.toContain('⟦/c1⟧');
 		expect(text).toMatch(/<passage page="2">\n⟦\/c1⟧ment was real but small|<passage page="2">\nment was real but small⟦\/c1⟧/);
-		expect(text).toContain('<document title="Lighthouses" source="PDFs/Lighthouses.pdf" pages="5" scope="commented passages with context">');
+		expect(text).toContain('<document title="Lighthouses" source="PDFs/Lighthouses.pdf" pages="5" scope="commented and highlighted passages with context">');
 		expect(text).not.toContain('Resolved one.');
 	});
 
@@ -118,5 +119,28 @@ describe('exportPdfForLLM', () => {
 		expect(pagesNeeded(THREADS, { ...base, includeResolved: true })).toEqual([1, 2, 3, 4]);
 		expect(pagesNeeded(THREADS, { ...base, scope: 'range', range: [4, 99] })).toEqual([4, 5]);
 		expect(pagesNeeded(THREADS, { ...base, mode: 'comments' })).toEqual([]);
+	});
+});
+
+describe('highlights in the export and digest', () => {
+	const hl: PdfThreads = {
+		...THREADS,
+		mark: { ...textThread(5, 'here is the land, here is the danger', [c('x', null, 'x')]), comments: [], color: 'green' },
+	};
+	it('marks highlights with == and does not count them as threads', () => {
+		const { text, stats } = exportPdfForLLM(hl, pageText, base);
+		expect(text).toContain('==here is the land, here is the danger==');
+		expect(text).toContain('==text== is text the author highlighted');
+		expect(stats).toMatchObject({ threads: 5, highlights: 1, pages: [1, 2, 3, 4, 5] });
+		expect(text).not.toContain('anchor="here is the land');
+		// text only keeps highlights, comments only leaves them out
+		expect(exportPdfForLLM(hl, pageText, { ...base, mode: 'text', scope: 'range', range: [5, 5] }).text).toContain('==here is the land');
+		expect(exportPdfForLLM(hl, pageText, { ...base, mode: 'comments' }).text).not.toContain('==');
+		expect(exportSummary(stats, 'full')).toContain('1 highlight');
+	});
+	it('lists highlights in the digest without a comment list', () => {
+		const d = renderDigest('PDFs/Lighthouses.pdf', { mark: hl.mark! });
+		expect(d).toContain('> here is the land, here is the danger\n\n[[PDFs/Lighthouses.pdf#page=5&comment=mark|Open]] · Highlight (green)');
+		expect(d.trimEnd().endsWith('Highlight (green)')).toBe(true);
 	});
 });

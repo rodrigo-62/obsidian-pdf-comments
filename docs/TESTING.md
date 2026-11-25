@@ -68,3 +68,10 @@ Start from `npm run vault:reset` (comment notes of earlier tries are in `test-va
 - **Copy link to comment:** card ⋯ menu → *Copy link to this comment*; paste and click the link: the PDF opens with that card active. In Obsidian's viewer the same link selects the passage.
 - **Settings:** three groups (opening, comments, page colours).
 - **README.md** describes installing and using the plugin.
+
+## Highlights
+
+- Select text, Ctrl+Alt+H (focus in the PDF), or the highlighter button: highlighted in the last colour, no card.
+- Right-click a selection: *Highlight* (last colour) and *Highlight in …* for the others.
+- Click a highlight: change its colour, *Add comment* (it becomes a comment with a card, keeping its colour), *Copy link to this highlight*, *Copy text*, *Remove highlight*.
+- The comment note lists highlights ("Highlight (green)"); Copy for LLM shows them as `==text==`.

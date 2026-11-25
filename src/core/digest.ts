@@ -17,7 +17,7 @@
 
 import { compareAnchors } from './anchor';
 import { buildTree, PRIORITY_LABELS, threadPriority, type TreeNode } from './shared/model';
-import { threadAnchor, type PdfThread, type PdfThreads } from './sidecar';
+import { isHighlight, threadAnchor, threadColor, type PdfThread, type PdfThreads } from './sidecar';
 import { formatPdfSubpath } from './subpath';
 
 /** "2026-11-25 15:41" in UTC (as the Docs plugin writes dates). */
@@ -66,8 +66,10 @@ function renderThread(pdfPath: string, id: string, t: PdfThread): string {
 	const prio = threadPriority(t);
 	if (prio !== 'normal') tags.push(`${PRIORITY_LABELS[prio]} priority`);
 	if (t.resolved) tags.push('Resolved');
+	if (isHighlight(t)) tags.unshift(`Highlight${threadColor(t) ? ` (${threadColor(t)})` : ''}`);
 	if (anchor && anchor.segments.length > 1) tags.push(`pages ${anchor.segments[0]!.page}–${anchor.segments[anchor.segments.length - 1]!.page}`);
-	return [quoteBlock(t, anchor?.area === true), '', [link, ...tags].join(' · '), '', ...renderComments(buildTree(t), 0)].join('\n');
+	const comments = renderComments(buildTree(t), 0);
+	return [quoteBlock(t, anchor?.area === true), '', [link, ...tags].join(' · '), ...(comments.length ? ['', ...comments] : [])].join('\n');
 }
 
 export function renderDigest(pdfPath: string, threads: PdfThreads): string {

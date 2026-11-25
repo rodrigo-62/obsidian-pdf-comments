@@ -12,6 +12,9 @@ export interface HighlightItem {
 	rects: Rect[];
 	area: boolean;
 	resolved: boolean;
+	/** A highlight without comments (DECISIONS H1.1). */
+	highlight?: boolean;
+	color?: string | null;
 }
 
 export interface HighlightState {
@@ -74,6 +77,8 @@ export class Highlights {
 				el.toggleClass('is-hover', it.id === hoverId && it.id !== activeId);
 				el.toggleClass('is-resolved', it.resolved);
 				el.toggleClass('is-draft', it.id === DRAFT_ID);
+				el.toggleClass('is-highlight', it.highlight === true);
+				if (it.color) el.addClass(`pdfc-color-${it.color}`);
 				el.setCssProps({
 					left: `${(css.left / w) * 100}%`,
 					top: `${(css.top / h) * 100}%`,

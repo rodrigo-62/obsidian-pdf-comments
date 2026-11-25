@@ -5,7 +5,7 @@
 
 import { compareAnchors, type Anchor } from './anchor';
 import { commentsInTimeOrder, threadPriority } from './shared/model';
-import { threadAnchor, type PdfThread, type PdfThreads } from './sidecar';
+import { isHighlight, threadAnchor, type PdfThread, type PdfThreads } from './sidecar';
 import { formatDate } from './digest';
 
 export type ExportScope = 'context' | 'commented-pages' | 'range' | 'all';
@@ -30,6 +30,7 @@ export interface PdfExportOptions {
 
 export interface ExportStats {
 	threads: number;
+	highlights: number;
 	resolvedOmitted: number;
 	pages: number[];
 	words: number;
@@ -73,11 +74,27 @@ export function unwrap(s: string): string {
 }
 
 /** Threads to export, numbered c1, c2… in reading order (anchored first, then detached). */
+interface Highlighted {
+	id: string;
+	anchor: Anchor;
+}
+
+/** Highlights (threads without comments) that are anchored to text, in reading order. */
+function highlightsOf(threads: PdfThreads): Highlighted[] {
+	const out: Highlighted[] = [];
+	for (const [id, t] of Object.entries(threads)) {
+		const a = threadAnchor(t);
+		if (isHighlight(t) && a && !a.area && !t.detached) out.push({ id, anchor: a });
+	}
+	return out.sort((x, y) => compareAnchors(x.anchor, y.anchor));
+}
+
 function numberThreads(threads: PdfThreads, includeResolved: boolean): { list: Numbered[]; resolvedOmitted: number } {
 	const anchored: Numbered[] = [];
 	const detached: Numbered[] = [];
 	let resolvedOmitted = 0;
 	for (const [id, t] of Object.entries(threads)) {
+		if (isHighlight(t)) continue;
 		if (t.resolved && !includeResolved) {
 			resolvedOmitted++;
 			continue;
@@ -93,8 +110,14 @@ function numberThreads(threads: PdfThreads, includeResolved: boolean): { list: N
 	return { list, resolvedOmitted };
 }
 
-function marksOf(list: Numbered[], areaOffsets: Record<string, number>): Mark[] {
+function marksOf(list: Numbered[], highlights: Highlighted[], areaOffsets: Record<string, number>): Mark[] {
 	const out: Mark[] = [];
+	for (const h of highlights) {
+		const first = h.anchor.segments[0]!;
+		const last = h.anchor.segments[h.anchor.segments.length - 1]!;
+		out.push({ page: first.page, offset: first.start ?? 0, text: '==', close: false });
+		out.push({ page: last.page, offset: last.end ?? 0, text: '==', close: true });
+	}
 	for (const x of list) {
 		const a = x.anchor;
 		if (!a) continue;
@@ -120,6 +143,7 @@ export function pagesNeeded(threads: PdfThreads, o: Pick<PdfExportOptions, 'scop
 	}
 	const pages = new Set<number>();
 	for (const x of numberThreads(threads, o.includeResolved === true).list) for (const s of x.anchor?.segments ?? []) pages.add(s.page);
+	for (const h of highlightsOf(threads)) for (const s of h.anchor.segments) pages.add(s.page);
 	return [...pages].sort((a, b) => a - b);
 }
 
@@ -165,7 +189,9 @@ export function exportPdfForLLM(threads: PdfThreads, pageText: (page: number) =>
 	const mode = o.mode ?? 'full';
 	const fmt = o.formatDate ?? formatDate;
 	const { list, resolvedOmitted } = numberThreads(threads, o.includeResolved === true);
-	const marks = mode === 'text' ? [] : marksOf(list, o.areaOffsets ?? {});
+	const highlights = highlightsOf(threads);
+	// Text only still shows highlights: they are not comments.
+	const marks = marksOf(mode === 'text' ? [] : list, highlights, o.areaOffsets ?? {});
 	const pages = pagesNeeded(threads, o);
 	const textBlocks: string[] = [];
 
@@ -187,6 +213,7 @@ export function exportPdfForLLM(threads: PdfThreads, pageText: (page: number) =>
 					windows.push(contextWindow(text, from, to, o.contextChars ?? 400));
 				}
 			}
+			for (const h of highlights) for (const s of h.anchor.segments) if (s.page === p) windows.push(contextWindow(text, s.start ?? 0, s.end ?? 0, o.contextChars ?? 400));
 			windows.sort((a, b) => a[0] - b[0]);
 			const merged: [number, number][] = [];
 			for (const w of windows) {
@@ -248,13 +275,14 @@ export function exportPdfForLLM(threads: PdfThreads, pageText: (page: number) =>
 	const scopeText = describeScope(o, pages);
 	if (mode !== 'comments') {
 		notation.push(`The text was extracted from a PDF (${o.totalPages} pages): line breaks were joined, and headers, footnotes, columns and hyphenation may not come out perfectly.`);
-		if (o.scope === 'context') notation.push('Only the commented passages are included, each with some text around it: <passage page="N"> is an excerpt of page N; "…" marks where the excerpt was cut.');
+		if (o.scope === 'context') notation.push('Only the commented and highlighted passages are included, each with some text around it: <passage page="N"> is an excerpt of page N; "…" marks where the excerpt was cut.');
 		else notation.push('<page n="N"> holds the text of page N. ' + (o.scope === 'all' ? 'All pages are included.' : 'Only some pages are included (see scope).'));
 	}
 	if (mode === 'full' && list.length) {
 		notation.push('⟦cN⟧…⟦/cN⟧ marks the exact text that comment thread cN refers to. Ranges may overlap, nest, or continue on the next page.');
 		if (marks.some((m) => m.text.includes(': area'))) notation.push('⟦cN: area on page P⟧ marks a comment on a region of the page (a figure, a formula), placed at about the height of that region.');
 	}
+	if (mode !== 'comments' && highlights.length) notation.push('==text== is text the author highlighted, without a comment.');
 	if (mode !== 'text' && list.length) {
 		notation.push(
 			mode === 'comments'
@@ -275,7 +303,7 @@ export function exportPdfForLLM(threads: PdfThreads, pageText: (page: number) =>
 	}
 	const text = parts.join('\n\n') + '\n';
 	const words = textBlocks.join(' ').replace(/<[^>]+>|⟦[^⟧]*⟧/g, ' ').split(/\s+/).filter(Boolean).length;
-	return { text, stats: { threads: list.length, resolvedOmitted, pages: mode === 'comments' ? [] : pages, words } };
+	return { text, stats: { threads: list.length, highlights: mode === 'comments' ? 0 : highlights.length, resolvedOmitted, pages: mode === 'comments' ? [] : pages, words } };
 }
 
 function describeScope(o: PdfExportOptions, pages: number[]): string {
@@ -289,13 +317,14 @@ function describeScope(o: PdfExportOptions, pages: number[]): string {
 		case 'commented-pages':
 			return pages.length ? `pages with comments: ${pages.join(', ')}` : 'pages with comments (none)';
 		default:
-			return 'commented passages with context';
+			return 'commented and highlighted passages with context';
 	}
 }
 
 export function exportSummary(s: ExportStats, mode: ExportMode): string {
 	const parts: string[] = [];
 	if (mode !== 'text') parts.push(`${s.threads} thread${s.threads === 1 ? '' : 's'}`);
+	if (s.highlights) parts.push(`${s.highlights} highlight${s.highlights === 1 ? '' : 's'}`);
 	if (mode !== 'comments') parts.push(`${s.pages.length} page${s.pages.length === 1 ? '' : 's'}`, `${s.words.toLocaleString('en')} words`);
 	let out = `Copied: ${parts.join(', ')}`;
 	if (s.resolvedOmitted && mode !== 'text') out += ` (${s.resolvedOmitted} resolved omitted)`;
